@@ -2,15 +2,17 @@ import * as THREE from 'three';
 import { Terrain } from './Terrain.js';
 import { Player } from './Player.js';
 import { Camera } from './Camera.js';
-import { ResourceCluster } from './ResourceCluster.js'; // ResourceCluster 임포트 추가
-import { Building } from './Building.js'; // Building도 추가 (혹시 누락 방지)
+import { ResourceCluster } from './ResourceCluster.js';
+import { Building } from './Building.js';
+import { Sky } from './Sky.js'; // Sky 클래스 임포트 추가
 
 console.log('Game.js loaded successfully');
 console.log('Terrain module:', Terrain);
 console.log('Player module:', Player);
 console.log('Camera module:', Camera);
-console.log('ResourceCluster module:', ResourceCluster); // 확인용 로그 추가
-console.log('Building module:', Building); // 확인용 로그 추가
+console.log('ResourceCluster module:', ResourceCluster);
+console.log('Building module:', Building);
+console.log('Sky module:', Sky);
 console.log('Defining Game class...');
 
 const CANNON = window.CANNON;
@@ -22,6 +24,7 @@ export class Game {
         try {
             this.scene = new THREE.Scene();
             console.log('Scene created:', this.scene);
+
             this.renderer = new THREE.WebGLRenderer({ antialias: true });
             console.log('Renderer created:', this.renderer);
             this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -114,6 +117,10 @@ export class Game {
             this.player = new Player(this.scene, this.terrain, this.world, this.resourceCluster, this.buildings);
             console.log('Player created:', this.player);
 
+            console.log('Creating Sky...');
+            this.sky = new Sky(this.scene); // Sky 클래스 초기화
+            console.log('Sky created:', this.sky);
+
             this.renderer.shadowMap.enabled = true;
             this.terrain.mesh.receiveShadow = true;
             console.log('Terrain shadow enabled');
@@ -134,10 +141,13 @@ export class Game {
         }
         if (this.player) {
             this.player.update();
-            this.cameraController.update(this.player.mesh.position, this.player.rotationY);
+            this.cameraController.update(this.player.mesh.position, this.player.rotationY, this.player.rotationX);
         }
         if (this.terrain.buildings) {
             this.terrain.buildings.forEach(building => building.update());
+        }
+        if (this.sky) {
+            this.sky.update(); // 구름 애니메이션용 (현재는 정적)
         }
         this.renderer.render(this.scene, this.cameraController.camera);
     }

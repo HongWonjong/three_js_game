@@ -91,7 +91,7 @@ export class Gun {
         bulletMesh.position.copy(this.mesh.getWorldPosition(new THREE.Vector3()));
         this.scene.add(bulletMesh);
 
-        const bulletShape = new CANNON.Sphere(0.05);
+        const bulletShape = new CANNON.Sphere(0.1);
         const bulletBody = new CANNON.Body({
             mass: 1,
             shape: bulletShape,
