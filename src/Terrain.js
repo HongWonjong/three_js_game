@@ -17,12 +17,17 @@ export class Terrain {
         this.trees = [];
         this.rocks = [];
         this.buildings = [];
+        this.mesh = null;
+    }
+
+    async init() {
         try {
-            this.createTerrain();
-            this.createBuildings(); // 빌딩 생성 분리
-            this.createResourceClusters(); // 자원 클러스터 생성 (이미 분리되어 있음)
+            await this.createTerrain();
+            await this.createBuildings();
+            await this.createResourceClusters();
+            console.log('Terrain initialization completed');
         } catch (error) {
-            console.error('Error in Terrain constructor:', error);
+            console.error('Error in Terrain initialization:', error);
         }
     }
 
@@ -241,6 +246,10 @@ export class Terrain {
     }
 
     getHeightAt(x, z) {
+        if (!this.mesh || !this.mesh.geometry) {
+            console.warn('Terrain mesh not initialized, returning 0');
+            return 0;
+        }
         const { width, height, segments } = this.mapData;
         const gridX = Math.floor((x + width / 2) / width * segments);
         const gridZ = Math.floor((z + height / 2) / height * segments);

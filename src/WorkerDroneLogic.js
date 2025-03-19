@@ -12,6 +12,8 @@ export class WorkerDroneLogic {
         this.carrying = null;
         this.avoidanceAngle = 0;
         this.isAvoiding = false;
+        this.avoidanceStartTime = 0;
+        this.avoidanceDuration = 3;
         this.lastUpdateTime = 0;
         this.updateInterval = 0.3;
         console.log('WorkerDroneLogic initialized');
@@ -52,6 +54,37 @@ export class WorkerDroneLogic {
         return nearest;
     }
 
+    findSafeWaypoint(currentPos, targetPos) {
+        const directionToTarget = targetPos.clone().sub(currentPos).setY(0).normalize();
+        const testAngles = [-Math.PI / 2, Math.PI / 2, -Math.PI / 4, Math.PI / 4];
+        let bestWaypoint = null;
+        let minDistanceToTarget = Infinity;
+
+        for (const angle of testAngles) {
+            const testDirection = directionToTarget.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+            const testPos = currentPos.clone().add(testDirection.multiplyScalar(5));
+
+            let isSafe = true;
+            this.world.bodies.forEach(body => {
+                if (body === this.drone.body || body === this.target?.body) return;
+                const bodyPos = new THREE.Vector3(body.position.x, body.position.y, body.position.z);
+                if (testPos.distanceTo(bodyPos) < 2) {
+                    isSafe = false;
+                }
+            });
+
+            if (isSafe) {
+                const distanceToTarget = testPos.distanceTo(targetPos);
+                if (distanceToTarget < minDistanceToTarget) {
+                    minDistanceToTarget = distanceToTarget;
+                    bestWaypoint = testPos;
+                }
+            }
+        }
+
+        return bestWaypoint || currentPos.clone().add(directionToTarget.multiplyScalar(5));
+    }
+
     moveToTarget(targetPos) {
         if (!targetPos) {
             console.log('No target position provided, stopping drone');
@@ -63,7 +96,17 @@ export class WorkerDroneLogic {
         const currentPos = new THREE.Vector3(this.drone.body.position.x, this.drone.body.position.y, this.drone.body.position.z);
         let direction = target.clone().sub(currentPos).setY(0).normalize();
 
-        // 장애물 감지: 앞쪽으로 2유닛 테스트
+        const currentTime = performance.now() / 1000;
+        const timeSinceAvoidance = currentTime - this.avoidanceStartTime;
+
+        if (this.isAvoiding && timeSinceAvoidance < this.avoidanceDuration) {
+            direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.avoidanceAngle);
+            const avoidanceSpeed = this.speed * 0.7;
+            this.drone.body.velocity.set(direction.x * avoidanceSpeed, this.drone.body.velocity.y, direction.z * avoidanceSpeed);
+            console.log('Continuing avoidance for', (this.avoidanceDuration - timeSinceAvoidance).toFixed(2), 'seconds, Velocity:', this.drone.body.velocity);
+            return;
+        }
+
         const forward = direction.clone().multiplyScalar(2);
         const testPos = currentPos.clone().add(forward);
         let closestObstacle = null;
@@ -80,14 +123,15 @@ export class WorkerDroneLogic {
         });
 
         if (closestObstacle) {
-            // 오른쪽으로만 회피 (고정된 90도)
-            this.avoidanceAngle = Math.PI / 2;
-            direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.avoidanceAngle);
+            const waypoint = this.findSafeWaypoint(currentPos, target);
+            direction = waypoint.clone().sub(currentPos).setY(0).normalize();
+            this.avoidanceAngle = Math.acos(directionToTarget.dot(direction));
+            if (directionToTarget.cross(direction).y < 0) this.avoidanceAngle = -this.avoidanceAngle;
             this.isAvoiding = true;
-
+            this.avoidanceStartTime = currentTime;
             const avoidanceSpeed = this.speed * 0.7;
             this.drone.body.velocity.set(direction.x * avoidanceSpeed, this.drone.body.velocity.y, direction.z * avoidanceSpeed);
-            console.log('Obstacle detected, avoiding to the right at angle:', this.avoidanceAngle, 'Velocity:', this.drone.body.velocity);
+            console.log('Obstacle detected, moving to safe waypoint:', waypoint, 'Velocity:', this.drone.body.velocity);
         } else {
             if (this.isAvoiding) {
                 this.avoidanceAngle = 0;
@@ -96,15 +140,6 @@ export class WorkerDroneLogic {
             }
             this.drone.body.velocity.set(direction.x * this.speed, this.drone.body.velocity.y, direction.z * this.speed);
             console.log('No obstacles, moving directly to:', target, 'Velocity:', this.drone.body.velocity);
-        }
-
-        // 높이 조정
-        const currentHeight = this.terrain.getHeightAt(this.drone.body.position.x, this.drone.body.position.z);
-        const targetHeight = currentHeight + 1;
-        if (Math.abs(this.drone.body.position.y - targetHeight) > 0.1) {
-            this.drone.body.position.y = targetHeight;
-            this.drone.body.velocity.y = 0;
-            console.log('Adjusted drone height to:', this.drone.body.position.y);
         }
     }
 
@@ -129,13 +164,16 @@ export class WorkerDroneLogic {
                 this.resourceCluster.rocks = this.resourceCluster.rocks.filter(r => r !== target);
             }
             console.log(`${target.type} depleted and removed`);
+            this.target = null; // 자원이 고갈되면 타겟 초기화
         }
 
         this.carrying = { type: target.type, amount: harvestAmount };
         this.drone.addResourceMesh(this.carrying.type);
-        target.isBeingHarvested = false;
-        this.target = null;
-        console.log('Resource collected, target reset');
+        if (this.target) {
+            console.log('Resource collected, continuing to harvest target:', this.target.body.position);
+        } else {
+            console.log('Resource depleted, target cleared');
+        }
     }
 
     update() {
@@ -147,7 +185,8 @@ export class WorkerDroneLogic {
 
         console.log('WorkerDroneLogic update called, carrying:', this.carrying, 'target:', this.target?.body?.position);
         if (!this.carrying) {
-            if (!this.target || !this.target.body) {
+            // 타겟이 없거나 유효하지 않을 때만 새 타겟 탐색
+            if (!this.target || !this.target.body || this.target.amount <= 0) {
                 this.target = this.findNearestTarget();
                 if (!this.target) {
                     console.log('No resources available, drone idle');

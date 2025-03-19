@@ -6,6 +6,46 @@ const CANNON = window.CANNON;
 console.log('CANNON:', CANNON);
 console.log('Defining ResourceCluster class...');
 
+// ResourceCluster 전용 모델 캐시
+const resourceModelCache = {
+    tree: null,
+    rock: null
+};
+
+// 모델을 미리 로드하는 함수
+async function preloadResourceModels() {
+    const loader = new GLTFLoader();
+
+    if (!resourceModelCache.tree) {
+        try {
+            console.log('Preloading Tree model');
+            resourceModelCache.tree = await loader.loadAsync('../assets/tree/tree.gltf');
+            console.log('Tree model preloaded');
+        } catch (error) {
+            console.error('Failed to preload Tree model:', error);
+        }
+    }
+
+    if (!resourceModelCache.rock) {
+        try {
+            console.log('Preloading Rock model');
+            resourceModelCache.rock = await loader.loadAsync('../assets/rock/rock.gltf');
+            console.log('Rock model preloaded');
+        } catch (error) {
+            console.error('Failed to preload Rock model:', error);
+        }
+    }
+}
+
+// 캐시 준비 여부를 확인하는 플래그
+let isCacheReady = false;
+preloadResourceModels().then(() => {
+    isCacheReady = true;
+    console.log('Resource models preload completed');
+}).catch(error => {
+    console.error('Error during resource preload:', error);
+});
+
 export class ResourceCluster {
     constructor(scene, terrain, world) {
         this.scene = scene;
@@ -19,75 +59,59 @@ export class ResourceCluster {
         if (!CANNON || !CANNON.Cylinder) {
             throw new Error('CANNON.Cylinder is not available. Ensure cannon.min.js is loaded.');
         }
-    
-        const loader = new GLTFLoader();
+
+        // 캐시가 준비될 때까지 대기
+        if (!isCacheReady) {
+            console.log('Waiting for resource models to preload...');
+            await new Promise(resolve => {
+                const checkCache = setInterval(() => {
+                    if (isCacheReady) {
+                        clearInterval(checkCache);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+
         const numClusters = 5;
         const clusterRadius = 50;
         const pairDistance = 150;
         const mapData = this.terrain.mapData;
-    
-        // 나무 모델 로드
-        let treeModel;
-        try {
-            console.log('Attempting to load tree model from: ../assets/tree/tree.gltf');
-            treeModel = await new Promise((resolve, reject) => {
-                loader.load(
-                    '../assets/tree/tree.gltf',
-                    (gltf) => {
-                        console.log('Tree model loaded successfully:', gltf.scene);
-                        resolve(gltf.scene);
-                    },
-                    undefined,
-                    (error) => {
-                        console.error('Error loading tree model:', error);
-                        reject(error);
-                    }
-                );
-            });
-            if (!(treeModel instanceof THREE.Object3D)) {
-                throw new Error('Loaded tree model is not a valid Object3D');
-            }
-        } catch (error) {
-            console.error('Failed to load tree model:', error);
-            return;
+
+        // 나무 모델 준비
+        let treeModel = resourceModelCache.tree ? resourceModelCache.tree.scene : null;
+        let treeSize;
+        if (treeModel) {
+            const treeBoundingBox = new THREE.Box3().setFromObject(treeModel);
+            treeSize = new THREE.Vector3();
+            treeBoundingBox.getSize(treeSize);
+            console.log('Tree model size (before scale):', treeSize);
+        } else {
+            console.error('Tree model not available in cache, using fallback');
+            treeModel = new THREE.Mesh(
+                new THREE.BoxGeometry(1, 5, 1),
+                new THREE.MeshBasicMaterial({ color: 0x8B4513 })
+            );
+            treeSize = new THREE.Vector3(1, 5, 1);
         }
-    
-        // 바위 모델 로드
-        let rockModel;
-        try {
-            console.log('Attempting to load rock model from: ../assets/rock/rock.gltf');
-            rockModel = await new Promise((resolve, reject) => {
-                loader.load(
-                    '../assets/rock/rock.gltf',
-                    (gltf) => {
-                        console.log('Rock model loaded successfully:', gltf.scene);
-                        resolve(gltf.scene);
-                    },
-                    undefined,
-                    (error) => {
-                        console.error('Error loading rock model:', error);
-                        reject(error);
-                    }
-                );
-            });
-            if (!(rockModel instanceof THREE.Object3D)) {
-                throw new Error('Loaded rock model is not a valid Object3D');
-            }
-        } catch (error) {
-            console.error('Failed to load rock model:', error);
-            return;
+
+        // 바위 모델 준비
+        let rockModel = resourceModelCache.rock ? resourceModelCache.rock.scene : null;
+        let rockSize;
+        if (rockModel) {
+            const rockBoundingBox = new THREE.Box3().setFromObject(rockModel);
+            rockSize = new THREE.Vector3();
+            rockBoundingBox.getSize(rockSize);
+            console.log('Rock model size (before scale):', rockSize);
+        } else {
+            console.error('Rock model not available in cache, using fallback');
+            rockModel = new THREE.Mesh(
+                new THREE.BoxGeometry(2, 2, 2),
+                new THREE.MeshBasicMaterial({ color: 0x808080 })
+            );
+            rockSize = new THREE.Vector3(2, 2, 2);
         }
-    
-        const treeBoundingBox = new THREE.Box3().setFromObject(treeModel);
-        const treeSize = new THREE.Vector3();
-        treeBoundingBox.getSize(treeSize);
-        console.log('Tree model size (before scale):', treeSize);
-    
-        const rockBoundingBox = new THREE.Box3().setFromObject(rockModel);
-        const rockSize = new THREE.Vector3();
-        rockBoundingBox.getSize(rockSize);
-        console.log('Rock model size (before scale):', rockSize);
-    
+
         const treeMaterial = new CANNON.Material('treeMaterial');
         const playerMaterial = new CANNON.Material('playerMaterial');
         const treePlayerContact = new CANNON.ContactMaterial(
@@ -96,16 +120,16 @@ export class ResourceCluster {
             { friction: 0.5, restitution: 0.1 }
         );
         this.world.addContactMaterial(treePlayerContact);
-    
+
         for (let i = 0; i < numClusters; i++) {
             const clusterX = (Math.random() - 0.5) * mapData.width * 0.8;
             const clusterZ = (Math.random() - 0.5) * mapData.height * 0.8;
-    
+
             const treeClusterX = clusterX + (Math.random() - 0.5) * pairDistance;
             const treeClusterZ = clusterZ + (Math.random() - 0.5) * pairDistance;
             const rockClusterX = treeClusterX + (Math.random() - 0.5) * pairDistance;
             const rockClusterZ = treeClusterZ + (Math.random() - 0.5) * pairDistance;
-    
+
             const treeScale = 0.2;
             for (let j = 0; j < 7; j++) {
                 const offsetX = (Math.random() - 0.5) * clusterRadius * 2;
@@ -113,13 +137,13 @@ export class ResourceCluster {
                 const x = treeClusterX + offsetX;
                 const z = treeClusterZ + offsetZ;
                 const y = this.terrain.getHeightAt(x, z);
-    
+
                 const tree = treeModel.clone();
                 console.log('Cloned tree:', tree);
                 tree.position.set(x, y, z);
                 tree.scale.set(treeScale, treeScale, treeScale);
                 this.scene.add(tree);
-    
+
                 const scaledTreeSize = treeSize.clone().multiplyScalar(treeScale);
                 const trunkWidthFactor = 0.15;
                 const trunkHeightFactor = 0.7;
@@ -134,17 +158,16 @@ export class ResourceCluster {
                 treeBody.addShape(treeShape);
                 treeBody.position.set(x, y + scaledTreeSize.y * trunkHeightFactor / 2, z);
                 this.world.addBody(treeBody);
-    
-                // 자원 속성 추가
+
                 this.trees.push({
                     mesh: tree,
                     body: treeBody,
-                    type: 'wood',  // 자원 유형
-                    amount: 100     // 채취 가능 양
+                    type: 'wood',
+                    amount: 100
                 });
             }
             console.log(`Tree cluster ${i + 1} created at (${treeClusterX}, ${treeClusterZ}) with 7 trees`);
-    
+
             const rockScale = 0.02;
             for (let j = 0; j < 7; j++) {
                 const offsetX = (Math.random() - 0.5) * clusterRadius * 2;
@@ -152,13 +175,13 @@ export class ResourceCluster {
                 const x = rockClusterX + offsetX;
                 const z = rockClusterZ + offsetZ;
                 const y = this.terrain.getHeightAt(x, z);
-    
+
                 const rock = rockModel.clone();
                 console.log('Cloned rock:', rock);
                 rock.position.set(x, y, z);
                 rock.scale.set(rockScale, rockScale, rockScale);
                 this.scene.add(rock);
-    
+
                 const scaledRockSize = rockSize.clone().multiplyScalar(rockScale);
                 const rockShape = new CANNON.Box(
                     new CANNON.Vec3(
@@ -171,13 +194,12 @@ export class ResourceCluster {
                 rockBody.addShape(rockShape);
                 rockBody.position.set(x, y + scaledRockSize.y / 2 - scaledRockSize.y * 0.25, z);
                 this.world.addBody(rockBody);
-    
-                // 자원 속성 추가
+
                 this.rocks.push({
                     mesh: rock,
                     body: rockBody,
-                    type: 'stone',  // 자원 유형
-                    amount: 100       // 채취 가능 양
+                    type: 'stone',
+                    amount: 100
                 });
             }
             console.log(`Rock cluster ${i + 1} created at (${rockClusterX}, ${rockClusterZ}) with 7 rocks`);

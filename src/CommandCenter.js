@@ -1,9 +1,8 @@
 import * as THREE from 'three';
-import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import { WorkerDrone } from './WorkerDrone.js';
 
 export class CommandCenter {
-    constructor(scene, world, resources, position, terrain, resourceCluster, game) {
+    constructor(scene, world, resources, position, terrain, resourceCluster, game, modelCache) {
         this.scene = scene;
         this.world = world;
         this.resources = resources;
@@ -15,15 +14,14 @@ export class CommandCenter {
         this.mesh = null;
         this.body = null;
         this.isLoading = true;
-
-        this.createPlaceholder();
-        this.init().catch(error => console.error('CommandCenter init failed:', error));
+        this.modelCache = modelCache;
     }
 
     async init() {
-        await this.createCommandCenter();
+        this.createPlaceholder(); // 먼저 플레이스홀더 생성
+        await this.createCommandCenter(); // 그 다음 커맨드 센터 생성
         this.isLoading = false;
-        await this.spawnDrones(); // 비동기적으로 드론 생성 대기
+        await this.spawnDrones();
         console.log('Command Center fully initialized with drones');
     }
 
@@ -39,38 +37,24 @@ export class CommandCenter {
     }
 
     async createCommandCenter() {
-        const loader = new GLTFLoader();
-        let model;
+        let model = this.modelCache.commandCenter ? this.modelCache.commandCenter.scene : null;
         let size = new THREE.Vector3(0.4, 0.4, 0.4);
 
-        try {
-            console.log('Loading Command Center model...');
-            model = await new Promise((resolve, reject) => {
-                loader.load(
-                    '../assets/buildings/command_center/command_center.gltf',
-                    (gltf) => resolve(gltf.scene),
-                    (progress) => console.log('Loading progress:', (progress.loaded / progress.total * 100).toFixed(2) + '%'),
-                    (error) => reject(error)
-                );
-            });
-        } catch (error) {
-            console.error('Failed to load Command Center model:', error);
-        }
-
-        if (this.mesh) {
+        // 기존 mesh가 있으면 안전하게 제거
+        if (this.mesh && this.mesh.geometry && this.mesh.material) {
             this.scene.remove(this.mesh);
             this.mesh.geometry.dispose();
             this.mesh.material.dispose();
         }
 
         if (model) {
-            this.mesh = model;
+            this.mesh = model.clone();
             this.mesh.scale.set(0.4, 0.4, 0.4);
             const boundingBox = new THREE.Box3().setFromObject(this.mesh);
             boundingBox.getSize(size);
             console.log('Command Center model size:', size);
         } else {
-            console.log('Using fallback mesh');
+            console.log('Using fallback mesh (cache not available)');
             const geometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
             const material = new THREE.MeshBasicMaterial({ color: 0x808080 });
             this.mesh = new THREE.Mesh(geometry, material);
@@ -91,22 +75,28 @@ export class CommandCenter {
     }
 
     async spawnDrones() {
-        for (let i = 0; i < 4; i++) {
+        const spawnDrone = async () => {
             const offset = new THREE.Vector3(
-                (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 30,
                 0,
-                (Math.random() - 0.5) * 10
+                (Math.random() - 0.5) * 30
             );
             const dronePosition = this.position.clone().add(offset);
             const terrainHeight = this.terrain.getHeightAt(dronePosition.x, dronePosition.z);
             dronePosition.y = terrainHeight + 1;
 
-            const drone = new WorkerDrone(this.scene, this.world, this.terrain, this.resourceCluster, this);
-            await drone.createDrone(); // 드론 생성 완료 대기
+            const drone = new WorkerDrone(this.scene, this.world, this.terrain, this.resourceCluster, this, this.modelCache);
+            await drone.createDrone();
             drone.mesh.position.copy(dronePosition);
             drone.body.position.copy(dronePosition);
             this.drones.push(drone);
-            console.log(`Drone ${i + 1} spawned at:`, dronePosition);
+            console.log(`Drone spawned at:`, dronePosition);
+        };
+
+        for (let i = 0; i < 4; i++) {
+            await new Promise(resolve => requestAnimationFrame(() => {
+                spawnDrone().then(resolve);
+            }));
         }
         console.log('Total drones spawned:', this.drones.length);
     }
@@ -121,9 +111,9 @@ export class CommandCenter {
         this.game.ui.updateUI();
     }
 
-    update() {
+    update(delta) {
         if (!this.isLoading) {
-            this.drones.forEach(drone => drone.update());
+            this.drones.forEach(drone => drone.update(delta));
         }
     }
 }
