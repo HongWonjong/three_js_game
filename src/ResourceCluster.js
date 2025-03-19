@@ -3,7 +3,7 @@ import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoade
 
 console.log('ResourceCluster.js loaded successfully');
 const CANNON = window.CANNON;
-console.log('CANNON:', CANNON); // 로드 상태 확인
+console.log('CANNON:', CANNON);
 console.log('Defining ResourceCluster class...');
 
 export class ResourceCluster {
@@ -26,7 +26,7 @@ export class ResourceCluster {
         const pairDistance = 150;
         const mapData = this.terrain.mapData;
     
-        // 나무 모델 로드 (기존 코드 유지)
+        // 나무 모델 로드
         let treeModel;
         try {
             console.log('Attempting to load tree model from: ../assets/tree/tree.gltf');
@@ -52,7 +52,7 @@ export class ResourceCluster {
             return;
         }
     
-        // 바위 모델 로드 (기존 코드 유지)
+        // 바위 모델 로드
         let rockModel;
         try {
             console.log('Attempting to load rock model from: ../assets/rock/rock.gltf');
@@ -88,7 +88,6 @@ export class ResourceCluster {
         rockBoundingBox.getSize(rockSize);
         console.log('Rock model size (before scale):', rockSize);
     
-        // 나무 재질 정의 (이전 수정 유지)
         const treeMaterial = new CANNON.Material('treeMaterial');
         const playerMaterial = new CANNON.Material('playerMaterial');
         const treePlayerContact = new CANNON.ContactMaterial(
@@ -121,28 +120,31 @@ export class ResourceCluster {
                 tree.scale.set(treeScale, treeScale, treeScale);
                 this.scene.add(tree);
     
-                // 나무 충돌체를 기둥 크기에 맞게 조정
                 const scaledTreeSize = treeSize.clone().multiplyScalar(treeScale);
-                const trunkWidthFactor = 0.15; // 기둥 너비를 전체 모델의 20%로 가정 (조정 가능)
-                const trunkHeightFactor = 0.7; // 기둥 높이를 전체 모델의 70%로 가정 (조정 가능)
+                const trunkWidthFactor = 0.15;
+                const trunkHeightFactor = 0.7;
                 const treeShape = new CANNON.Box(
                     new CANNON.Vec3(
-                        scaledTreeSize.x * trunkWidthFactor / 2, // 기둥 너비 축소
-                        scaledTreeSize.y * trunkHeightFactor / 2, // 기둥 높이 조정
-                        scaledTreeSize.z * trunkWidthFactor / 2  // 기둥 깊이 축소
+                        scaledTreeSize.x * trunkWidthFactor / 2,
+                        scaledTreeSize.y * trunkHeightFactor / 2,
+                        scaledTreeSize.z * trunkWidthFactor / 2
                     )
                 );
                 const treeBody = new CANNON.Body({ mass: 0, material: treeMaterial });
                 treeBody.addShape(treeShape);
-                // 충돌체 중심을 기둥 하단에 맞추고 약간의 여유 공간 추가
                 treeBody.position.set(x, y + scaledTreeSize.y * trunkHeightFactor / 2, z);
                 this.world.addBody(treeBody);
     
-                this.trees.push({ mesh: tree, body: treeBody });
+                // 자원 속성 추가
+                this.trees.push({
+                    mesh: tree,
+                    body: treeBody,
+                    type: 'wood',  // 자원 유형
+                    amount: 100     // 채취 가능 양
+                });
             }
             console.log(`Tree cluster ${i + 1} created at (${treeClusterX}, ${treeClusterZ}) with 7 trees`);
     
-            // 바위 생성 (이전 수정 유지)
             const rockScale = 0.02;
             for (let j = 0; j < 7; j++) {
                 const offsetX = (Math.random() - 0.5) * clusterRadius * 2;
@@ -170,7 +172,13 @@ export class ResourceCluster {
                 rockBody.position.set(x, y + scaledRockSize.y / 2 - scaledRockSize.y * 0.25, z);
                 this.world.addBody(rockBody);
     
-                this.rocks.push({ mesh: rock, body: rockBody });
+                // 자원 속성 추가
+                this.rocks.push({
+                    mesh: rock,
+                    body: rockBody,
+                    type: 'stone',  // 자원 유형
+                    amount: 100       // 채취 가능 양
+                });
             }
             console.log(`Rock cluster ${i + 1} created at (${rockClusterX}, ${rockClusterZ}) with 7 rocks`);
         }
