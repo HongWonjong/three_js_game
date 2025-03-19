@@ -31,7 +31,7 @@ export class Camera {
 
     onMouseWheel(event) {
         // 마우스 휠 방향에 따라 거리 비율 조정
-        const delta = event.deltaY * 0.001;
+        const delta = event.deltaY * -0.001;
         this.distance -= delta;
         this.distance = THREE.MathUtils.clamp(this.distance, this.minDistance, this.maxDistance);
         console.log('Camera distance adjusted:', this.distance);

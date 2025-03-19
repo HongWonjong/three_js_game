@@ -32,6 +32,7 @@ export class Player {
     }
 
     setupControls() {
+        // 키보드 이벤트
         document.addEventListener('keydown', (event) => {
             this.keys[event.key.toLowerCase()] = true;
         });
@@ -39,6 +40,7 @@ export class Player {
             this.keys[event.key.toLowerCase()] = false;
         });
 
+        // 마우스 회전 이벤트
         document.addEventListener('mousemove', (event) => {
             if (document.pointerLockElement === document.body) {
                 const sensitivity = 0.002;
@@ -46,6 +48,21 @@ export class Player {
                 this.mesh.rotation.y = this.rotationY;
             }
         });
+
+        // 클릭 시 포인터 락 요청
+        document.addEventListener('click', () => {
+            document.body.requestPointerLock();
+        });
+
+        // 포인터 락 상태 변화 감지
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement === document.body) {
+                console.log('Pointer lock activated');
+            } else {
+                console.log('Pointer lock deactivated');
+            }
+        });
+
         console.log('Player controls set up');
     }
 
