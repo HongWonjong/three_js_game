@@ -25,30 +25,20 @@ export class WorkerDroneLogic {
             return null;
         }
 
+        const allResources = [...trees, ...rocks]; // 나무와 바위를 통합 배열로
         let nearest = null;
         let minDist = Infinity;
-        const dronePos = this.drone.body.position;
+        const centerPos = this.commandCenter.body.position; // 커맨드 센터 기준
 
-        for (const tree of trees) {
-            if (!tree.body || !tree.body.position || tree.amount <= 0 || tree.isBeingHarvested) {
-                console.log('Invalid, depleted, or already targeted tree detected:', tree);
+        for (const resource of allResources) {
+            if (!resource.body || !resource.body.position || resource.amount <= 0 || resource.isBeingHarvested) {
+                console.log('Invalid, depleted, or already targeted resource detected:', resource);
                 continue;
             }
-            const dist = dronePos.distanceTo(tree.body.position);
+            const dist = centerPos.distanceTo(resource.body.position);
             if (dist < minDist) {
                 minDist = dist;
-                nearest = tree;
-            }
-        }
-        for (const rock of rocks) {
-            if (!rock.body || !rock.body.position || rock.amount <= 0 || rock.isBeingHarvested) {
-                console.log('Invalid, depleted, or already targeted rock detected:', rock);
-                continue;
-            }
-            const dist = dronePos.distanceTo(rock.body.position);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = rock;
+                nearest = resource;
             }
         }
 
@@ -56,7 +46,7 @@ export class WorkerDroneLogic {
             nearest.isBeingHarvested = true; // 타겟 선택 시 즉시 채취 중으로 표시
             console.log(`Nearest target found and reserved: ${nearest.type} at distance ${minDist}, position:`, nearest.body.position);
         } else {
-            console.log('No valid targets found');
+            console.log('No valid targets found from Command Center');
         }
         return nearest;
     }
