@@ -55,21 +55,45 @@ export class Game {
             this.resources.stone -= 100;
             this.ui.updateUI();
     
+            const playerPos = this.player.mesh.position;
+            const distanceToPlayer = position.distanceTo(playerPos);
+            const minDistance = 10;
+            let adjustedPosition = position.clone();
+    
+            if (distanceToPlayer < minDistance) {
+                const direction = position.clone().sub(playerPos).normalize();
+                adjustedPosition = playerPos.clone().add(direction.multiplyScalar(minDistance));
+                console.log(`Adjusted Command Center position: ${adjustedPosition.toArray()}`);
+            }
+    
             const commandCenter = new CommandCenter(
                 this.scene,
                 this.world,
                 this.resources,
-                position,
+                adjustedPosition,
                 this.terrain,
                 this.resourceCluster,
-                this 
+                this
             );
-            this.commandCenters.push(commandCenter);
-            console.log('Command Center built at:', position);
+            this.commandCenters.push(commandCenter); // 즉시 추가
+            console.log('Command Center construction started at:', adjustedPosition);
         } else {
             this.ui.showWarning('Not enough resources to build Command Center!');
-            console.log('Not enough resources to build Command Center!');
+            console.log('Not enough resources!');
         }
+    }
+    
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        if (this.world) this.world.step(1 / 60);
+        if (this.player) {
+            this.player.update();
+            this.cameraController.update(this.player.mesh.position, this.player.rotationY, this.player.rotationX);
+        }
+        if (this.terrain.buildings) this.terrain.buildings.forEach(building => building.update());
+        if (this.commandCenters) this.commandCenters.forEach(center => center.update()); // 로딩 여부와 상관없이 호출 가능
+        if (this.sky) this.sky.update();
+        this.renderer.render(this.scene, this.cameraController.camera);
     }
 
     async loadMap(mapPath) {
@@ -112,18 +136,6 @@ export class Game {
         this.animate();
     }
 
-    animate() {
-        requestAnimationFrame(() => this.animate());
-        if (this.world) this.world.step(1 / 60);
-        if (this.player) {
-            this.player.update();
-            this.cameraController.update(this.player.mesh.position, this.player.rotationY, this.player.rotationX);
-        }
-        if (this.terrain.buildings) this.terrain.buildings.forEach(building => building.update());
-        if (this.commandCenters) this.commandCenters.forEach(center => center.update());
-        if (this.sky) this.sky.update();
-        this.renderer.render(this.scene, this.cameraController.camera);
-    }
 
     onWindowResize() {
         this.cameraController.camera.aspect = window.innerWidth / window.innerHeight;

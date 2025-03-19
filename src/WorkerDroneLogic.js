@@ -11,8 +11,9 @@ export class WorkerDroneLogic {
         this.target = null;
         this.carrying = null;
         this.avoidanceAngle = 0;
+        this.isAvoiding = false;
         this.lastUpdateTime = 0;
-        this.updateInterval = 0.3; // 0.3초 간격
+        this.updateInterval = 0.3;
         console.log('WorkerDroneLogic initialized');
     }
 
@@ -25,10 +26,10 @@ export class WorkerDroneLogic {
             return null;
         }
 
-        const allResources = [...trees, ...rocks]; // 나무와 바위를 통합 배열로
+        const allResources = [...trees, ...rocks];
         let nearest = null;
         let minDist = Infinity;
-        const centerPos = this.commandCenter.body.position; // 커맨드 센터 기준
+        const centerPos = this.commandCenter.body.position;
 
         for (const resource of allResources) {
             if (!resource.body || !resource.body.position || resource.amount <= 0 || resource.isBeingHarvested) {
@@ -43,7 +44,7 @@ export class WorkerDroneLogic {
         }
 
         if (nearest) {
-            nearest.isBeingHarvested = true; // 타겟 선택 시 즉시 채취 중으로 표시
+            nearest.isBeingHarvested = true;
             console.log(`Nearest target found and reserved: ${nearest.type} at distance ${minDist}, position:`, nearest.body.position);
         } else {
             console.log('No valid targets found from Command Center');
@@ -62,29 +63,45 @@ export class WorkerDroneLogic {
         const currentPos = new THREE.Vector3(this.drone.body.position.x, this.drone.body.position.y, this.drone.body.position.z);
         let direction = target.clone().sub(currentPos).setY(0).normalize();
 
+        // 장애물 감지: 앞쪽으로 2유닛 테스트
         const forward = direction.clone().multiplyScalar(2);
         const testPos = currentPos.clone().add(forward);
-        const isBlocked = this.world.bodies.some(body => {
-            if (body === this.drone.body || body === this.target?.body) return false;
+        let closestObstacle = null;
+        let minDistToObstacle = Infinity;
+
+        this.world.bodies.forEach(body => {
+            if (body === this.drone.body || body === this.target?.body) return;
             const bodyPos = new THREE.Vector3(body.position.x, body.position.y, body.position.z);
-            return testPos.distanceTo(bodyPos) < 2;
+            const dist = testPos.distanceTo(bodyPos);
+            if (dist < 2 && dist < minDistToObstacle) {
+                minDistToObstacle = dist;
+                closestObstacle = bodyPos;
+            }
         });
 
-        if (isBlocked) {
-            this.avoidanceAngle += Math.PI / 4;
+        if (closestObstacle) {
+            // 오른쪽으로만 회피 (고정된 90도)
+            this.avoidanceAngle = Math.PI / 2;
             direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.avoidanceAngle);
-            console.log('Obstacle detected, avoiding at angle:', this.avoidanceAngle);
+            this.isAvoiding = true;
+
+            const avoidanceSpeed = this.speed * 0.7;
+            this.drone.body.velocity.set(direction.x * avoidanceSpeed, this.drone.body.velocity.y, direction.z * avoidanceSpeed);
+            console.log('Obstacle detected, avoiding to the right at angle:', this.avoidanceAngle, 'Velocity:', this.drone.body.velocity);
         } else {
-            this.avoidanceAngle = 0;
-            console.log('No obstacles, moving directly');
+            if (this.isAvoiding) {
+                this.avoidanceAngle = 0;
+                this.isAvoiding = false;
+                console.log('Obstacle cleared, resuming direct path');
+            }
+            this.drone.body.velocity.set(direction.x * this.speed, this.drone.body.velocity.y, direction.z * this.speed);
+            console.log('No obstacles, moving directly to:', target, 'Velocity:', this.drone.body.velocity);
         }
 
-        this.drone.body.velocity.set(direction.x * this.speed, this.drone.body.velocity.y, direction.z * this.speed);
-        console.log('Drone moving to:', target, 'Velocity:', this.drone.body.velocity);
-
+        // 높이 조정
         const currentHeight = this.terrain.getHeightAt(this.drone.body.position.x, this.drone.body.position.z);
         const targetHeight = currentHeight + 1;
-        if (this.drone.body.position.y < targetHeight) {
+        if (Math.abs(this.drone.body.position.y - targetHeight) > 0.1) {
             this.drone.body.position.y = targetHeight;
             this.drone.body.velocity.y = 0;
             console.log('Adjusted drone height to:', this.drone.body.position.y);
@@ -116,7 +133,7 @@ export class WorkerDroneLogic {
 
         this.carrying = { type: target.type, amount: harvestAmount };
         this.drone.addResourceMesh(this.carrying.type);
-        target.isBeingHarvested = false; // 채취 완료 후 해제
+        target.isBeingHarvested = false;
         this.target = null;
         console.log('Resource collected, target reset');
     }
@@ -124,7 +141,7 @@ export class WorkerDroneLogic {
     update() {
         const currentTime = performance.now() / 1000;
         if (currentTime - this.lastUpdateTime < this.updateInterval) {
-            return; // 0.3초 미만이면 스킵
+            return;
         }
         this.lastUpdateTime = currentTime;
 
@@ -141,7 +158,7 @@ export class WorkerDroneLogic {
 
             const dist = this.drone.body.position.distanceTo(this.target.body.position);
             console.log('Distance to target:', dist);
-            if (dist < 10) { // 거리 10 유지
+            if (dist < 10) {
                 this.collectResource(this.target);
             } else {
                 this.moveToTarget(this.target.body.position);
@@ -149,7 +166,7 @@ export class WorkerDroneLogic {
         } else {
             const dist = this.drone.body.position.distanceTo(this.commandCenter.body.position);
             console.log('Distance to Command Center:', dist);
-            if (dist < 10) { // 거리 10 유지
+            if (dist < 10) {
                 this.commandCenter.receiveResources(this.carrying.type, this.carrying.amount);
                 this.drone.removeResourceMesh();
                 this.carrying = null;

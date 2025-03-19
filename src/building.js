@@ -42,7 +42,7 @@ export class Building {
     
             // 지형 높이에 정확히 맞추기
             const terrainHeight = this.terrain.getHeightAt(this.position.x, this.position.z);
-            this.position.y = terrainHeight - 2; // 메시의 바닥을 지형 높이에 맞춤
+            this.position.y = terrainHeight; // 메시의 바닥을 지형 높이에 맞춤
             this.mesh.position.copy(this.position);
             this.scene.add(this.mesh);
     

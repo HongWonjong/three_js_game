@@ -19,7 +19,8 @@ export class Terrain {
         this.buildings = [];
         try {
             this.createTerrain();
-            this.createResourceClusters();
+            this.createBuildings(); // 빌딩 생성 분리
+            this.createResourceClusters(); // 자원 클러스터 생성 (이미 분리되어 있음)
         } catch (error) {
             console.error('Error in Terrain constructor:', error);
         }
@@ -177,32 +178,28 @@ export class Terrain {
         const groundPlayerContact = new CANNON.ContactMaterial(
             groundMaterial,
             playerMaterial,
-            {
-                friction: 0.1,
-                restitution: 0.1
-            }
+            { friction: 0.1, restitution: 0.1 }
         );
         const groundBuildingContact = new CANNON.ContactMaterial(
             groundMaterial,
             buildingMaterial,
-            {
-                friction: 0.1,
-                restitution: 0.1
-            }
+            { friction: 0.1, restitution: 0.1 }
         );
         const playerBuildingContact = new CANNON.ContactMaterial(
             playerMaterial,
             buildingMaterial,
-            {
-                friction: 0.1,
-                restitution: 0.1
-            }
+            { friction: 0.1, restitution: 0.1 }
         );
         this.world.addContactMaterial(groundPlayerContact);
         this.world.addContactMaterial(groundBuildingContact);
         this.world.addContactMaterial(playerBuildingContact);
 
+        console.log('Terrain mesh assigned:', this.mesh);
+    }
+
+    async createBuildings() {
         console.log('Creating buildings...');
+        const { width, height } = this.mapData;
         for (let i = 0; i < 5; i++) {
             const x = (Math.random() - 0.5) * width * 0.8;
             const z = (Math.random() - 0.5) * height * 0.8;
@@ -214,8 +211,15 @@ export class Terrain {
             console.log(`Building ${i + 1} created at position:`, position);
         }
         console.log('Buildings created:', this.buildings.length);
+    }
 
-        console.log('Terrain mesh assigned:', this.mesh);
+    async createResourceClusters() {
+        console.log('Creating resource clusters...');
+        const resourceCluster = new ResourceCluster(this.scene, this, this.world);
+        await resourceCluster.createClusters();
+        this.trees = resourceCluster.trees;
+        this.rocks = resourceCluster.rocks;
+        console.log('Resource clusters created:', this.trees.length, 'trees,', this.rocks.length, 'rocks');
     }
 
     addHill(geometry, hill) {
@@ -234,15 +238,6 @@ export class Terrain {
             }
         }
         console.log('Hill added to geometry');
-    }
-
-    async createResourceClusters() {
-        console.log('Creating resource clusters...');
-        const resourceCluster = new ResourceCluster(this.scene, this, this.world);
-        await resourceCluster.createClusters();
-        this.trees = resourceCluster.trees;
-        this.rocks = resourceCluster.rocks;
-        console.log('Resource clusters created:', this.trees.length, 'trees,', this.rocks.length, 'rocks');
     }
 
     getHeightAt(x, z) {
