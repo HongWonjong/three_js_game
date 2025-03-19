@@ -6,10 +6,10 @@ console.log('Defining JumpController class...');
 export class JumpController {
     constructor(playerBody, terrain) {
         console.log('JumpController constructor called with playerBody:', playerBody, 'and terrain:', terrain);
-        this.body = playerBody; // 물리 바디 사용
+        this.body = playerBody;
         this.terrain = terrain;
         this.isGrounded = false;
-        this.jumpStrength = 5; // 물리 엔진 기준 점프 힘 (조정 필요)
+        this.jumpStrength = 10;
         this.keys = {};
         this.setupControls();
     }
@@ -18,7 +18,6 @@ export class JumpController {
         document.addEventListener('keydown', (event) => {
             this.keys[event.key.toLowerCase()] = true;
             if (event.key === ' ' && this.isGrounded) {
-                // 물리 바디에 점프 힘 적용
                 this.body.velocity.y = this.jumpStrength;
                 this.isGrounded = false;
             }
@@ -30,18 +29,16 @@ export class JumpController {
     }
 
     update() {
-        // 지형 높이 계산
-        const terrainHeight = this.terrain.getHeightAt(this.body.position.x, this.body.position.z);
-        const playerBottom = this.body.position.y - 0.5; // Sphere 반지름 0.5 고려
-
-        // 지형과 충돌 체크
-        if (playerBottom <= terrainHeight) {
-            this.body.position.y = terrainHeight + 0.5;
-            this.body.velocity.y = 0;
-            this.isGrounded = true;
-        } else {
-            this.isGrounded = false;
+        // Trimesh는 물리 엔진이 충돌을 처리하므로, 지형 높이 조정 불필요
+        // isGrounded는 물리 엔진의 충돌 이벤트를 통해 설정
+        // 여기서는 단순히 점프 상태만 관리
+        if (this.body.velocity.y < -0.1) {
+            this.isGrounded = false; // 떨어지는 중
         }
+    }
+
+    setGrounded(isGrounded) {
+        this.isGrounded = isGrounded;
     }
 }
 

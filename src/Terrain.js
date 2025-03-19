@@ -23,7 +23,7 @@ export class Terrain {
         }
     }
 
-    createTerrain() {
+    async createTerrain() {
         console.log('Creating terrain...');
         const { width, height, segments, hills } = this.mapData;
         console.log('Map data for terrain:', { width, height, segments, hills });
@@ -49,20 +49,19 @@ export class Terrain {
 
         // 텍스처 로드
         const textureLoader = new THREE.TextureLoader();
-        const grassTextures = [
-            textureLoader.load('../assets/textures/grass1.jpg', () => console.log('grass1 loaded')),
-            textureLoader.load('../assets/textures/grass2.jpg', () => console.log('grass2 loaded')),
-            textureLoader.load('../assets/textures/grass3.jpg', () => console.log('grass3 loaded')),
-            textureLoader.load('../assets/textures/grass4.jpg', () => console.log('grass4 loaded'))
-        ];
-        const dirtTextures = [
-            textureLoader.load('../assets/textures/dirt1.jpg', () => console.log('dirt1 loaded')),
-            textureLoader.load('../assets/textures/dirt2.jpg', () => console.log('dirt2 loaded')),
-            textureLoader.load('../assets/textures/dirt3.jpg', () => console.log('dirt3 loaded')),
-            textureLoader.load('../assets/textures/dirt4.jpg', () => console.log('dirt4 loaded'))
-        ];
+        const grassTextures = await Promise.all([
+            textureLoader.loadAsync('../assets/textures/grass1.jpg', () => console.log('grass1 loaded')),
+            textureLoader.loadAsync('../assets/textures/grass2.jpg', () => console.log('grass2 loaded')),
+            textureLoader.loadAsync('../assets/textures/grass3.jpg', () => console.log('grass3 loaded')),
+            textureLoader.loadAsync('../assets/textures/grass4.jpg', () => console.log('grass4 loaded'))
+        ]);
+        const dirtTextures = await Promise.all([
+            textureLoader.loadAsync('../assets/textures/dirt1.jpg', () => console.log('dirt1 loaded')),
+            textureLoader.loadAsync('../assets/textures/dirt2.jpg', () => console.log('dirt2 loaded')),
+            textureLoader.loadAsync('../assets/textures/dirt3.jpg', () => console.log('dirt3 loaded')),
+            textureLoader.loadAsync('../assets/textures/dirt4.jpg', () => console.log('dirt4 loaded'))
+        ]);
 
-        // 텍스처 설정 (깜빡임 방지)
         grassTextures.forEach(tex => {
             tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
             tex.repeat.set(width / 10, height / 10);
@@ -78,7 +77,6 @@ export class Terrain {
             tex.generateMipmaps = true;
         });
 
-        // 셰이더로 다중 텍스처 패턴
         const material = new THREE.ShaderMaterial({
             uniforms: {
                 grass1: { value: grassTextures[0] },
@@ -118,12 +116,11 @@ export class Terrain {
                 }
 
                 void main() {
-                    float n = noise(vUv * 10.0); // 고정된 UV 기반 노이즈
+                    float n = noise(vUv * 10.0);
                     float heightFactor = clamp(vHeight / maxHeight, 0.0, 1.0);
 
                     vec4 finalColor;
                     if (vHeight > 0.0) {
-                        // 언덕: dirt1~4 중 랜덤 선택
                         float dirtNoise = noise(vUv * 5.0 + vec2(1.0));
                         if (dirtNoise < 0.25) {
                             finalColor = texture2D(dirt1, vUv);
@@ -135,7 +132,6 @@ export class Terrain {
                             finalColor = texture2D(dirt4, vUv);
                         }
                     } else {
-                        // 평지: grass1~4 중 랜덤 선택
                         if (n < 0.25) {
                             finalColor = texture2D(grass1, vUv);
                         } else if (n < 0.5) {
@@ -160,31 +156,19 @@ export class Terrain {
         console.log('Terrain mesh added to scene');
         this.mesh = terrainMesh;
 
-        // Heightfield로 물리 바디 생성
-        const heightData = [];
-        const rows = segments + 1;
-        const cols = segments + 1;
-        for (let z = 0; z < rows; z++) {
-            const row = [];
-            for (let x = 0; x < cols; x++) {
-                const index = (z * cols + x) * 3 + 2;
-                row.push(vertices[index]);
-            }
-            heightData.push(row);
-        }
-
-        const heightfieldShape = new CANNON.Heightfield(heightData, {
-            elementSize: width / segments
-        });
+        // Trimesh로 물리 바디 생성
+        const indices = geometry.index.array;
+        const positions = geometry.attributes.position.array;
+        const trimeshShape = new CANNON.Trimesh(positions, indices);
         this.groundBody = new CANNON.Body({
-            mass: 0,
-            shape: heightfieldShape,
+            mass: 0, // 정적 객체
+            shape: trimeshShape,
             material: new CANNON.Material('groundMaterial')
         });
-        this.groundBody.position.set(-width / 2, 0, height / 2);
+        this.groundBody.position.set(0, 0, 0);
         this.groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
         this.world.addBody(this.groundBody);
-        console.log('Terrain physics body (Heightfield) created and added:', this.groundBody);
+        console.log('Terrain physics body (Trimesh) created and added:', this.groundBody);
 
         const groundMaterial = this.groundBody.material;
         const playerMaterial = new CANNON.Material('playerMaterial');
