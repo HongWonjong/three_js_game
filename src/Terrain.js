@@ -172,7 +172,9 @@ export class Terrain {
 
         const groundMaterial = this.groundBody.material;
         const playerMaterial = new CANNON.Material('playerMaterial');
-        const contactMaterial = new CANNON.ContactMaterial(
+        const buildingMaterial = new CANNON.Material('buildingMaterial');
+
+        const groundPlayerContact = new CANNON.ContactMaterial(
             groundMaterial,
             playerMaterial,
             {
@@ -180,16 +182,33 @@ export class Terrain {
                 restitution: 0.1
             }
         );
-        this.world.addContactMaterial(contactMaterial);
+        const groundBuildingContact = new CANNON.ContactMaterial(
+            groundMaterial,
+            buildingMaterial,
+            {
+                friction: 0.1,
+                restitution: 0.1
+            }
+        );
+        const playerBuildingContact = new CANNON.ContactMaterial(
+            playerMaterial,
+            buildingMaterial,
+            {
+                friction: 0.1,
+                restitution: 0.1
+            }
+        );
+        this.world.addContactMaterial(groundPlayerContact);
+        this.world.addContactMaterial(groundBuildingContact);
+        this.world.addContactMaterial(playerBuildingContact);
 
-        // 건물 5개 생성
         console.log('Creating buildings...');
         for (let i = 0; i < 5; i++) {
             const x = (Math.random() - 0.5) * width * 0.8;
             const z = (Math.random() - 0.5) * height * 0.8;
             const y = this.getHeightAt(x, z);
             const position = new THREE.Vector3(x, y, z);
-            const building = new Building(this.scene, this.world, position, this); // terrain 전달
+            const building = new Building(this.scene, this.world, position, this);
             await building.load();
             this.buildings.push(building);
             console.log(`Building ${i + 1} created at position:`, position);

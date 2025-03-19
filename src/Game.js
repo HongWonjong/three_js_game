@@ -26,8 +26,8 @@ export class Game {
             console.log('Renderer DOM element appended');
 
             this.world = new CANNON.World();
-            this.world.gravity.set(0, -16.00, 0);
-            console.log('Physics world created:', this.world);
+            this.world.gravity.set(0, -20, 0);
+            console.log('Physics world created with gravity:', this.world.gravity);
 
             window.addEventListener('resize', () => this.onWindowResize(), false);
             console.log('Resize event listener added');
@@ -85,7 +85,7 @@ export class Game {
 
             console.log('Creating Terrain...');
             this.terrain = new Terrain(this.scene, mapData, this.world);
-            await this.terrain.createTerrain(); // 비동기 메서드 호출
+            await this.terrain.createTerrain();
             console.log('Terrain created:', this.terrain);
 
             console.log('Creating Player...');
@@ -113,6 +113,9 @@ export class Game {
         if (this.player) {
             this.player.update();
             this.cameraController.update(this.player.mesh.position, this.player.rotationY);
+        }
+        if (this.terrain.buildings) {
+            this.terrain.buildings.forEach(building => building.update());
         }
         this.renderer.render(this.scene, this.cameraController.camera);
     }
