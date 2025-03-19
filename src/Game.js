@@ -2,11 +2,15 @@ import * as THREE from 'three';
 import { Terrain } from './Terrain.js';
 import { Player } from './Player.js';
 import { Camera } from './Camera.js';
+import { ResourceCluster } from './ResourceCluster.js'; // ResourceCluster 임포트 추가
+import { Building } from './Building.js'; // Building도 추가 (혹시 누락 방지)
 
 console.log('Game.js loaded successfully');
 console.log('Terrain module:', Terrain);
 console.log('Player module:', Player);
 console.log('Camera module:', Camera);
+console.log('ResourceCluster module:', ResourceCluster); // 확인용 로그 추가
+console.log('Building module:', Building); // 확인용 로그 추가
 console.log('Defining Game class...');
 
 const CANNON = window.CANNON;
@@ -88,8 +92,26 @@ export class Game {
             await this.terrain.createTerrain();
             console.log('Terrain created:', this.terrain);
 
+            console.log('Creating ResourceCluster...');
+            this.resourceCluster = new ResourceCluster(this.scene, this.terrain, this.world);
+            await this.resourceCluster.createClusters();
+            console.log('ResourceCluster created:', this.resourceCluster);
+
+            console.log('Creating Buildings...');
+            this.buildings = [];
+            const buildingPositions = [
+                new THREE.Vector3(10, 0, 10),
+                new THREE.Vector3(-10, 0, -10)
+            ];
+            for (const pos of buildingPositions) {
+                const building = new Building(this.scene, this.world, pos, this.terrain);
+                await building.load();
+                this.buildings.push(building);
+            }
+            console.log('Buildings created:', this.buildings);
+
             console.log('Creating Player...');
-            this.player = new Player(this.scene, this.terrain, this.world);
+            this.player = new Player(this.scene, this.terrain, this.world, this.resourceCluster, this.buildings);
             console.log('Player created:', this.player);
 
             this.renderer.shadowMap.enabled = true;

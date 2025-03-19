@@ -14,11 +14,11 @@ export class Camera {
         );
 
         // 초기 거리 설정
-        this.baseY = 20; // 기본 Y 오프셋
-        this.baseZ = -30; // 기본 Z 오프셋
+        this.baseY = 10; // 기본 Y 오프셋
+        this.baseZ = -20; // 기본 Z 오프셋
         this.distance = 1.0; // 거리 비율 (1.0: 기본 거리, 0.5: 절반 거리)
-        this.minDistance = 0.3; // 최소 거리 비율 (절반)
-        this.maxDistance = 1.0; // 최대 거리 비율 (기본)
+        this.minDistance = 0.1; // 최소 거리 비율 (절반)
+        this.maxDistance = 0.5; // 최대 거리 비율 (기본)
 
         // 초기 위치 설정
         this.camera.position.set(0, this.baseY, this.baseZ);

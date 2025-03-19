@@ -11,17 +11,20 @@ const CANNON = window.CANNON;
 console.log('CANNON:', CANNON);
 
 export class Player {
-    constructor(scene, terrain, world) {
-        console.log('Player constructor called with scene:', scene, 'and terrain:', terrain, 'and world:', world);
+    constructor(scene, terrain, world, resourceCluster, buildings) {
+        console.log('Player constructor called with scene:', scene, 'terrain:', terrain, 'world:', world);
         this.scene = scene;
         this.terrain = terrain;
         this.world = world;
+        this.resourceCluster = resourceCluster;
+        this.buildings = buildings;
         this.speed = 10;
-        this.rotationY = 0;
+        this.rotationX = 0; // 위아래 회전
+        this.rotationY = 0; // 좌우 회전
         this.keys = {};
         this.createPlayer();
-        this.jumpController = new JumpController(this.body, this.terrain); // body 전달
-        this.gun = new Gun(this.scene, this.mesh);
+        this.jumpController = new JumpController(this.body, this.terrain);
+        this.gun = new Gun(this.scene, this.mesh, this.world, this.terrain, this.resourceCluster, this.buildings);
         this.setupControls();
     }
 
@@ -42,6 +45,7 @@ export class Player {
         });
         this.world.addBody(this.body);
 
+        this.mesh.userData.physicsBody = this.body;
         console.log('Player mesh and body created:', this.mesh, this.body);
     }
 
@@ -56,9 +60,17 @@ export class Player {
         document.addEventListener('mousemove', (event) => {
             if (document.pointerLockElement === document.body) {
                 const sensitivity = 0.002;
-                this.rotationY -= event.movementX * sensitivity;
-                this.mesh.rotation.y = this.rotationY;
-                this.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), this.rotationY);
+                this.rotationY -= event.movementX * sensitivity; // 좌우 회전
+                this.rotationX -= event.movementY * sensitivity; // 위아래 회전
+                // 위아래 회전 제한 (-60도 ~ 60도, 약 -1.047 ~ 1.047 라디안)
+                this.rotationX = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, this.rotationX));
+
+                // 쿼터니언으로 회전 계산
+                const quaternion = new THREE.Quaternion();
+                quaternion.setFromEuler(new THREE.Euler(this.rotationX, this.rotationY, 0, 'YXZ'));
+
+                this.mesh.quaternion.copy(quaternion);
+                this.body.quaternion.copy(quaternion);
             }
         });
 
@@ -95,21 +107,10 @@ export class Player {
             this.body.velocity.z *= 0.9;
         }
 
-        // 회전 제한 (최대 10도)
-        const maxAngle = 10 * (Math.PI / 180);
-        const quaternion = this.body.quaternion;
-        const euler = new CANNON.Vec3();
-        quaternion.toEuler(euler);
-        euler.x = Math.max(-maxAngle, Math.min(maxAngle, euler.x));
-        euler.z = Math.max(-maxAngle, Math.min(maxAngle, euler.z));
-        euler.y = this.rotationY;
-        quaternion.setFromEuler(euler.x, euler.y, euler.z);
-
         this.jumpController.update();
-        this.gun.update(this.rotationY);
+        this.gun.update();
 
         this.mesh.position.copy(this.body.position);
-        this.mesh.quaternion.copy(this.body.quaternion);
     }
 }
 
