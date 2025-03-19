@@ -20,7 +20,7 @@ export class Player {
         this.rotationY = 0;
         this.keys = {};
         this.createPlayer();
-        this.jumpController = new JumpController(this.mesh, this.terrain);
+        this.jumpController = new JumpController(this.body, this.terrain); // body 전달
         this.gun = new Gun(this.scene, this.mesh);
         this.setupControls();
     }
@@ -95,22 +95,14 @@ export class Player {
             this.body.velocity.z *= 0.9;
         }
 
-        // 회전 제한 (최대 80도)
-        const maxAngle = 10 * (Math.PI / 180); // 80도를 라디안으로 변환 (약 1.396)
+        // 회전 제한 (최대 10도)
+        const maxAngle = 10 * (Math.PI / 180);
         const quaternion = this.body.quaternion;
-
-        // 쿼터니언에서 오일러 각도로 변환
         const euler = new CANNON.Vec3();
         quaternion.toEuler(euler);
-
-        // X축과 Z축 회전 제한
         euler.x = Math.max(-maxAngle, Math.min(maxAngle, euler.x));
         euler.z = Math.max(-maxAngle, Math.min(maxAngle, euler.z));
-
-        // Y축 회전은 유지 (마우스 회전)
         euler.y = this.rotationY;
-
-        // 제한된 각도로 쿼터니언 재설정
         quaternion.setFromEuler(euler.x, euler.y, euler.z);
 
         this.jumpController.update();
