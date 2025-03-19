@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ResourceCluster } from './ResourceCluster.js';
+import { Building } from './Building.js';
 
 console.log('Terrain.js loaded successfully');
 console.log('Defining Terrain class...');
@@ -15,6 +16,7 @@ export class Terrain {
         this.world = world;
         this.trees = [];
         this.rocks = [];
+        this.buildings = [];
         try {
             this.createTerrain();
             this.createResourceClusters();
@@ -47,7 +49,6 @@ export class Terrain {
         geometry.computeVertexNormals();
         console.log('Vertex normals computed');
 
-        // 텍스처 로드
         const textureLoader = new THREE.TextureLoader();
         const grassTextures = await Promise.all([
             textureLoader.loadAsync('../assets/textures/grass1.jpg', () => console.log('grass1 loaded')),
@@ -156,12 +157,11 @@ export class Terrain {
         console.log('Terrain mesh added to scene');
         this.mesh = terrainMesh;
 
-        // Trimesh로 물리 바디 생성
         const indices = geometry.index.array;
         const positions = geometry.attributes.position.array;
         const trimeshShape = new CANNON.Trimesh(positions, indices);
         this.groundBody = new CANNON.Body({
-            mass: 0, // 정적 객체
+            mass: 0,
             shape: trimeshShape,
             material: new CANNON.Material('groundMaterial')
         });
@@ -181,6 +181,20 @@ export class Terrain {
             }
         );
         this.world.addContactMaterial(contactMaterial);
+
+        // 건물 5개 생성
+        console.log('Creating buildings...');
+        for (let i = 0; i < 5; i++) {
+            const x = (Math.random() - 0.5) * width * 0.8;
+            const z = (Math.random() - 0.5) * height * 0.8;
+            const y = this.getHeightAt(x, z);
+            const position = new THREE.Vector3(x, y, z);
+            const building = new Building(this.scene, this.world, position, this); // terrain 전달
+            await building.load();
+            this.buildings.push(building);
+            console.log(`Building ${i + 1} created at position:`, position);
+        }
+        console.log('Buildings created:', this.buildings.length);
 
         console.log('Terrain mesh assigned:', this.mesh);
     }
