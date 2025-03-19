@@ -26,7 +26,7 @@ export class Game {
             console.log('Renderer DOM element appended');
 
             this.world = new CANNON.World();
-            this.world.gravity.set(0, -9.82, 0);
+            this.world.gravity.set(0, -16.00, 0);
             console.log('Physics world created:', this.world);
 
             window.addEventListener('resize', () => this.onWindowResize(), false);
