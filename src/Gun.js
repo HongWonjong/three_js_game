@@ -18,10 +18,9 @@ export class Gun {
         this.bullets = [];
         this.createGun();
 
-        // 왼쪽 마우스 클릭으로 발사 이벤트 설정
         document.addEventListener('click', (event) => {
-            if (event.button === 0) { // 왼쪽 마우스 버튼 (button 0)
-                if (document.pointerLockElement === document.body) { // 포인터 잠금 상태에서만 발사
+            if (event.button === 0) {
+                if (document.pointerLockElement === document.body) {
                     this.shoot();
                 }
             }
@@ -44,7 +43,7 @@ export class Gun {
 
             this.mesh = gltf.scene;
             this.mesh.scale.set(0.2, 0.2, 0.2);
-            this.mesh.position.set(0.5, 0.5, -0.5);
+            this.mesh.position.set(0.4, -0.6, 0.5); // 플레이어 손에 맞춘 1인칭 위치
             this.mesh.castShadow = true;
             console.log('Gun mesh created with position:', this.mesh.position);
 
@@ -87,9 +86,18 @@ export class Gun {
         const bulletGeometry = new THREE.SphereGeometry(0.2, 16, 16);
         const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         const bulletMesh = new THREE.Mesh(bulletGeometry, bulletMaterial);
-        
-        bulletMesh.position.copy(this.mesh.getWorldPosition(new THREE.Vector3()));
+
+        // 총구 위치 계산 (총 메쉬의 로컬 좌표 기준)
+        const muzzleOffset = new THREE.Vector3(0, 1, 0); // 총구가 총의 앞쪽에 있다고 가정 (모델에 따라 조정 필요)
+        const muzzlePosition = muzzleOffset.clone().applyQuaternion(this.mesh.quaternion).add(this.mesh.getWorldPosition(new THREE.Vector3()));
+        bulletMesh.position.copy(muzzlePosition);
         this.scene.add(bulletMesh);
+
+        // 총구 방향 계산
+        const direction = new THREE.Vector3(0, 0, 1) // 총의 로컬 -Z 방향 (총구 방향)
+            .applyQuaternion(this.mesh.quaternion) // 총의 회전 적용
+            .applyQuaternion(this.playerMesh.quaternion); // 플레이어의 회전 적용
+        direction.normalize();
 
         const bulletShape = new CANNON.Sphere(0.1);
         const bulletBody = new CANNON.Body({
@@ -98,8 +106,7 @@ export class Gun {
             material: new CANNON.Material('bulletMaterial')
         });
         bulletBody.position.copy(bulletMesh.position);
-        
-        const direction = new THREE.Vector3(0, 0, 1).applyQuaternion(this.playerMesh.quaternion);
+
         const bulletSpeed = 200;
         bulletBody.velocity.set(
             direction.x * bulletSpeed,
@@ -116,6 +123,8 @@ export class Gun {
                 this.removeBullet(bulletMesh, bulletBody);
             }
         });
+
+        console.log('Shot fired from muzzle at:', muzzlePosition, 'Direction:', direction);
     }
 
     isCollidableObject(body) {
