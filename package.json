@@ -1,0 +1,24 @@
+{
+  "name": "three",
+  "version": "1.0.0",
+  "description": "three.js로 3d 게임을 웹사이트 상에 구현하려는 야심찬 프로젝트다. <현재 구조> three_js_project/ ├── index.html ├── main.js ├── assets/ │   ├── player.glb │   ├── gun.glb ├── src/ │   ├── Game.js │   ├── Terrain.js │   ├── Player.js │   ├── Camera.js │   ├── JumpController.js │   ├── Gun.js └── README.md",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HongWonjong/three.js.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/HongWonjong/three.js/issues"
+  },
+  "homepage": "https://github.com/HongWonjong/three.js#readme",
+  "dependencies": {
+    "three": "^0.174.0"
+  }
+}

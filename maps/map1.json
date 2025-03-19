@@ -1,0 +1,13 @@
+{
+    "width": 500,
+    "height": 500,
+    "segments": 100,
+    "hills": [
+        { "x": 100, "z": 100, "height": 10, "radius": 20 },
+        { "x": -100, "z": 100, "height": 8, "radius": 15 },
+        { "x": 100, "z": -100, "height": 12, "radius": 25 },
+        { "x": -100, "z": -100, "height": 10, "radius": 20 },
+        { "x": 200, "z": 200, "height": 15, "radius": 30 },
+        { "x": -200, "z": -200, "height": 15, "radius": 30 }
+    ]
+}

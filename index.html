@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Three.js Terrain Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { width: 100%; height: 100%; }
+        #lockScreen { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0, 0, 0, 0.5); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            color: white; 
+            font-size: 24px; 
+            cursor: pointer; 
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./node_modules/three/build/three.module.js"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="lockScreen">Click to Start</div>
+    <script type="module">
+        // main.js 로드 시도
+        try {
+            console.log('Attempting to load main.js from ./main.js');
+            const module = await import('./main.js');
+            console.log('main.js loaded successfully:', module);
+        } catch (error) {
+            console.error('Failed to load main.js:', error);
+        }
+    </script>
+</body>
+</html>
