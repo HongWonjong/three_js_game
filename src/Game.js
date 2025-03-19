@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import { Terrain } from './Terrain.js';
 import { Player } from './Player.js';
-import { Camera } from './Camera.js'; // CameraController.js -> Camera.js, CameraController -> Camera
+import { Camera } from './Camera.js';
 
 console.log('Game.js loaded successfully');
 console.log('Terrain module:', Terrain);
 console.log('Player module:', Player);
-console.log('Camera module:', Camera); // CameraController -> Camera
+console.log('Camera module:', Camera);
 console.log('Defining Game class...');
+
+const CANNON = window.CANNON;
+console.log('CANNON:', CANNON);
 
 export class Game {
     constructor() {
@@ -21,6 +24,10 @@ export class Game {
             console.log('Renderer size set:', window.innerWidth, window.innerHeight);
             document.body.appendChild(this.renderer.domElement);
             console.log('Renderer DOM element appended');
+
+            this.world = new CANNON.World();
+            this.world.gravity.set(0, -9.82, 0);
+            console.log('Physics world created:', this.world);
 
             window.addEventListener('resize', () => this.onWindowResize(), false);
             console.log('Resize event listener added');
@@ -41,10 +48,9 @@ export class Game {
             }
             const mapData = await response.json();
             console.log('Map data loaded successfully:', mapData);
-            this.init(mapData);
+            await this.init(mapData);
         } catch (error) {
             console.error('Failed to load map:', error);
-            // 대체 맵 데이터로 초기화
             const defaultMapData = {
                 width: 100,
                 height: 100,
@@ -57,11 +63,11 @@ export class Game {
                 ]
             };
             console.log('Using default map data due to load failure:', defaultMapData);
-            this.init(defaultMapData);
+            await this.init(defaultMapData);
         }
     }
 
-    init(mapData) {
+    async init(mapData) {
         console.log('Initializing game with map data:', mapData);
         try {
             const ambientLight = new THREE.AmbientLight(0x404040, 1);
@@ -74,17 +80,19 @@ export class Game {
             this.scene.add(directionalLight);
             console.log('Directional light added:', directionalLight);
 
-            this.cameraController = new Camera(this.scene); // CameraController -> Camera
+            this.cameraController = new Camera(this.scene);
             console.log('Camera created:', this.cameraController);
 
             console.log('Creating Terrain...');
-            this.terrain = new Terrain(this.scene, mapData);
+            this.terrain = new Terrain(this.scene, mapData, this.world);
+            await this.terrain.createTerrain(); // 비동기 메서드 호출
             console.log('Terrain created:', this.terrain);
 
             console.log('Creating Player...');
-            this.player = new Player(this.scene, this.terrain);
+            this.player = new Player(this.scene, this.terrain, this.world);
             console.log('Player created:', this.player);
 
+            this.renderer.shadowMap.enabled = true;
             this.terrain.mesh.receiveShadow = true;
             console.log('Terrain shadow enabled');
 
@@ -99,6 +107,9 @@ export class Game {
 
     animate() {
         requestAnimationFrame(() => this.animate());
+        if (this.world) {
+            this.world.step(1 / 60);
+        }
         if (this.player) {
             this.player.update();
             this.cameraController.update(this.player.mesh.position, this.player.rotationY);

@@ -24,13 +24,16 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "./node_modules/three/build/three.module.js"
+                "three": "./node_modules/three/build/three.module.js",
+                "cannon": "./node_modules/cannon/build/cannon.min.js"
             }
         }
     </script>
 </head>
 <body>
     <div id="lockScreen">Click to Start</div>
+    <!-- Cannon.js를 전역으로 로드 -->
+    <script src="./node_modules/cannon/build/cannon.min.js"></script>
     <script type="module">
         // main.js 로드 시도
         try {
