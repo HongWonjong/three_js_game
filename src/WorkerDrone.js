@@ -9,7 +9,6 @@ export class WorkerDrone {
         this.logic = new WorkerDroneLogic(this, world, terrain, resourceCluster, commandCenter);
         this.mesh = null;
         this.body = null;
-        // constructor에서는 초기화만 하고, createDrone은 외부에서 호출
     }
 
     async createDrone() {
@@ -106,6 +105,17 @@ export class WorkerDrone {
         this.logic.update();
         if (this.mesh && this.body) {
             this.mesh.position.copy(this.body.position);
+
+            // 이동 방향으로 회전
+            const velocity = new THREE.Vector3(this.body.velocity.x, 0, this.body.velocity.z); // y축 회전 무시
+            const speed = velocity.length();
+            if (speed > 0.1) { // 속도가 충분히 클 때만 회전 (작은 진동 방지)
+                const direction = velocity.clone().normalize();
+                const targetPosition = this.mesh.position.clone().add(direction);
+                this.mesh.lookAt(targetPosition);
+                console.log('Drone rotated to face direction:', direction);
+            }
+
             console.log('Drone mesh position updated to:', this.mesh.position);
         }
     }
