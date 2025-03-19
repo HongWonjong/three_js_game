@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import { WorkerDroneLogic } from './WorkerDroneLogic.js';
 
 export class WorkerDrone {
@@ -6,27 +7,61 @@ export class WorkerDrone {
         this.scene = scene;
         this.world = world;
         this.logic = new WorkerDroneLogic(this, world, terrain, resourceCluster, commandCenter);
-        this.createDrone();
-        console.log('WorkerDrone created with position:', this.mesh.position);
+        this.mesh = null;
+        this.body = null;
+        // constructor에서는 초기화만 하고, createDrone은 외부에서 호출
     }
 
-    createDrone() {
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        this.mesh = new THREE.Mesh(geometry, material);
+    async createDrone() {
+        const loader = new GLTFLoader();
+        let model;
+        let size;
+
+        try {
+            console.log('Loading WorkerDrone model from: /assets/robots/worker/worker.gltf');
+            model = await new Promise((resolve, reject) => {
+                loader.load(
+                    '/assets/robots/worker/worker.gltf',
+                    (gltf) => {
+                        console.log('WorkerDrone model loaded successfully:', gltf.scene);
+                        resolve(gltf.scene);
+                    },
+                    (progress) => console.log('Loading progress:', (progress.loaded / progress.total * 100).toFixed(2) + '%'),
+                    (error) => reject(error)
+                );
+            });
+        } catch (error) {
+            console.error('Failed to load WorkerDrone model:', error);
+        }
+
+        if (model) {
+            this.mesh = model;
+            this.mesh.scale.set(0.5, 0.5, 0.5);
+            const boundingBox = new THREE.Box3().setFromObject(this.mesh);
+            size = new THREE.Vector3();
+            boundingBox.getSize(size);
+            console.log('WorkerDrone model size (scaled):', size);
+        } else {
+            console.log('Using fallback mesh');
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            this.mesh = new THREE.Mesh(geometry, material);
+            size = new THREE.Vector3(1, 1, 1);
+        }
         this.scene.add(this.mesh);
 
-        const shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+        const shape = new CANNON.Box(new CANNON.Vec3(size.x / 2, size.y / 2, size.z / 2));
         this.body = new CANNON.Body({ mass: 1 });
         this.body.addShape(shape);
         this.body.position.copy(this.mesh.position);
         this.body.velocity.set(0, 0, 0);
         this.body.material = new CANNON.Material('droneMaterial');
-        this.body.material.friction = 0; // 마찰 0으로 설정
+        this.body.material.friction = 0;
         this.world.addBody(this.body);
         console.log('Drone body added to world:', this.body.position);
 
         this.createPickaxe();
+        console.log('WorkerDrone created with position:', this.mesh.position);
     }
 
     createPickaxe() {
@@ -69,8 +104,9 @@ export class WorkerDrone {
 
     update() {
         this.logic.update();
-        // 물리 바디와 메시 위치 동기화
-        this.mesh.position.copy(this.body.position);
-        console.log('Drone mesh position updated to:', this.mesh.position);
+        if (this.mesh && this.body) {
+            this.mesh.position.copy(this.body.position);
+            console.log('Drone mesh position updated to:', this.mesh.position);
+        }
     }
 }

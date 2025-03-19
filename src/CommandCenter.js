@@ -16,16 +16,14 @@ export class CommandCenter {
         this.body = null;
         this.isLoading = true;
 
-        // 플레이스홀더 생성
         this.createPlaceholder();
-        // 비동기 초기화 시작
         this.init().catch(error => console.error('CommandCenter init failed:', error));
     }
 
     async init() {
         await this.createCommandCenter();
-        this.isLoading = false; // 로딩 완료
-        this.spawnDrones(); // 로딩 완료 후 드론 생성
+        this.isLoading = false;
+        await this.spawnDrones(); // 비동기적으로 드론 생성 대기
         console.log('Command Center fully initialized with drones');
     }
 
@@ -59,7 +57,6 @@ export class CommandCenter {
             console.error('Failed to load Command Center model:', error);
         }
 
-        // 플레이스홀더 제거
         if (this.mesh) {
             this.scene.remove(this.mesh);
             this.mesh.geometry.dispose();
@@ -93,18 +90,19 @@ export class CommandCenter {
         console.log('Command Center fully loaded and added at:', this.position);
     }
 
-    spawnDrones() {
+    async spawnDrones() {
         for (let i = 0; i < 4; i++) {
             const offset = new THREE.Vector3(
-                (Math.random() - 0.5) * 20,
+                (Math.random() - 0.5) * 10,
                 0,
-                (Math.random() - 0.5) * 20
+                (Math.random() - 0.5) * 10
             );
             const dronePosition = this.position.clone().add(offset);
             const terrainHeight = this.terrain.getHeightAt(dronePosition.x, dronePosition.z);
             dronePosition.y = terrainHeight + 1;
 
             const drone = new WorkerDrone(this.scene, this.world, this.terrain, this.resourceCluster, this);
+            await drone.createDrone(); // 드론 생성 완료 대기
             drone.mesh.position.copy(dronePosition);
             drone.body.position.copy(dronePosition);
             this.drones.push(drone);
