@@ -5,7 +5,7 @@ import { Camera } from './Camera.js';
 import { ResourceCluster } from './ResourceCluster.js';
 import { Sky } from './Sky.js';
 import { GameUI } from './GameUI.js';
-import { preloadModels } from './ModelCache.js';
+import { preloadModels, modelCache } from './ModelCache.js';
 import { BuildingManager } from './BuildingManager.js';
 
 export class Game {
@@ -19,11 +19,10 @@ export class Game {
         this.world.gravity.set(0, -20, 0);
 
         this.resources = { wood: 100, stone: 100 };
-        this.commandCenters = [];
+        this.buildings = [];
 
-        window.addEventListener('resize', () => this.onWindowResize(), false);
         this.ui = new GameUI(this);
-        this.buildingManager = new BuildingManager(this); // BuildingManager 추가
+        this.buildingManager = new BuildingManager(this);
 
         this.loadMap('maps/map1.json');
     }
@@ -39,8 +38,8 @@ export class Game {
             this.player.update();
             this.cameraController.update(this.player.mesh.position, this.player.rotationY, this.player.rotationX);
         }
-        if (this.terrain.buildings) this.terrain.buildings.forEach(building => building.update());
-        if (this.commandCenters) this.commandCenters.forEach(center => center.update(delta));
+        if (this.terrain?.buildings) this.terrain.buildings.forEach(building => building.update());
+        if (this.buildings) this.buildings.forEach(building => building.update(delta));
         if (this.sky) this.sky.update();
         this.renderer.render(this.scene, this.cameraController.camera);
     }
@@ -49,7 +48,14 @@ export class Game {
         const mapData = await fetch(mapPath).then(res => res.json()).catch(() => ({
             width: 100, height: 100, segments: 50, hills: []
         }));
-        await preloadModels(); // ModelCache에서 가져옴
+        await preloadModels();
+        if (!modelCache.commandCenter || !modelCache.barrack) {
+            console.error('Critical error: Required building models failed to preload. Check paths in ModelCache.js');
+            // 진행 중단 가능성 고려 (필요 시 주석 해제)
+            // throw new Error('Model preload failed');
+        } else {
+            console.log('All models preloaded successfully');
+        }
         await this.init(mapData);
     }
 
@@ -75,12 +81,18 @@ export class Game {
         this.renderer.shadowMap.enabled = true;
         this.terrain.mesh.receiveShadow = true;
 
+        window.addEventListener('resize', () => this.onWindowResize(), false);
+
         this.animate();
     }
 
     onWindowResize() {
-        this.cameraController.camera.aspect = window.innerWidth / window.innerHeight;
-        this.cameraController.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        if (this.cameraController && this.cameraController.camera) {
+            this.cameraController.camera.aspect = window.innerWidth / window.innerHeight;
+            this.cameraController.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+        } else {
+            console.warn('CameraController not initialized yet');
+        }
     }
 }
