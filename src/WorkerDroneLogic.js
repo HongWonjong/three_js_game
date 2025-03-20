@@ -16,10 +16,14 @@ export class WorkerDroneLogic {
         this.avoidanceDuration = 3;
         this.lastUpdateTime = 0;
         this.updateInterval = 0.3;
+        this.isHarvesting = false; // 채굴 상태 추가
+        this.harvestStartTime = 0; // 채굴 시작 시간 추가
+        this.harvestDuration = 3; // 채굴 시간 3초
         console.log('WorkerDroneLogic initialized');
     }
 
     findNearestTarget() {
+        // 기존 로직 동일
         const trees = this.resourceCluster.trees || [];
         const rocks = this.resourceCluster.rocks || [];
         console.log('Available trees:', trees.length, 'rocks:', rocks.length);
@@ -55,6 +59,7 @@ export class WorkerDroneLogic {
     }
 
     findSafeWaypoint(currentPos, targetPos) {
+        // 기존 로직 동일
         const directionToTarget = targetPos.clone().sub(currentPos).setY(0).normalize();
         const testAngles = [-Math.PI / 2, Math.PI / 2, -Math.PI / 4, Math.PI / 4];
         let bestWaypoint = null;
@@ -86,6 +91,7 @@ export class WorkerDroneLogic {
     }
 
     moveToTarget(targetPos) {
+        // 기존 로직 동일
         if (!targetPos) {
             console.log('No target position provided, stopping drone');
             this.drone.body.velocity.set(0, this.drone.body.velocity.y, 0);
@@ -149,8 +155,6 @@ export class WorkerDroneLogic {
             return;
         }
 
-        this.drone.animatePickaxe();
-        console.log(`Collecting ${target.type} at position:`, target.body.position);
         const harvestAmount = Math.min(8, target.amount);
         target.amount -= harvestAmount;
         console.log(`Harvested ${harvestAmount} ${target.type}, remaining:`, target.amount);
@@ -164,16 +168,13 @@ export class WorkerDroneLogic {
                 this.resourceCluster.rocks = this.resourceCluster.rocks.filter(r => r !== target);
             }
             console.log(`${target.type} depleted and removed`);
-            this.target = null; // 자원이 고갈되면 타겟 초기화
+            this.target = null;
         }
 
         this.carrying = { type: target.type, amount: harvestAmount };
         this.drone.addResourceMesh(this.carrying.type);
-        if (this.target) {
-            console.log('Resource collected, continuing to harvest target:', this.target.body.position);
-        } else {
-            console.log('Resource depleted, target cleared');
-        }
+        this.isHarvesting = false; // 채굴 완료
+        console.log('Resource collected, carrying:', this.carrying);
     }
 
     update() {
@@ -184,8 +185,8 @@ export class WorkerDroneLogic {
         this.lastUpdateTime = currentTime;
 
         console.log('WorkerDroneLogic update called, carrying:', this.carrying, 'target:', this.target?.body?.position);
+
         if (!this.carrying) {
-            // 타겟이 없거나 유효하지 않을 때만 새 타겟 탐색
             if (!this.target || !this.target.body || this.target.amount <= 0) {
                 this.target = this.findNearestTarget();
                 if (!this.target) {
@@ -198,7 +199,19 @@ export class WorkerDroneLogic {
             const dist = this.drone.body.position.distanceTo(this.target.body.position);
             console.log('Distance to target:', dist);
             if (dist < 10) {
-                this.collectResource(this.target);
+                if (!this.isHarvesting) {
+                    this.isHarvesting = true;
+                    this.harvestStartTime = currentTime;
+                    this.drone.body.velocity.set(0, this.drone.body.velocity.y, 0); // 채굴 중 이동 멈춤
+                    console.log('Starting harvest of', this.target.type, 'at', this.target.body.position);
+                }
+
+                const timeSinceHarvestStart = currentTime - this.harvestStartTime;
+                if (timeSinceHarvestStart >= this.harvestDuration) {
+                    this.collectResource(this.target);
+                } else {
+                    console.log('Harvesting in progress, time remaining:', (this.harvestDuration - timeSinceHarvestStart).toFixed(2), 'seconds');
+                }
             } else {
                 this.moveToTarget(this.target.body.position);
             }

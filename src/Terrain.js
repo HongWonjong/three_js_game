@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { ResourceCluster } from './ResourceCluster.js';
-import { Building } from './Building.js';
-
+import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 console.log('Terrain.js loaded successfully');
 console.log('Defining Terrain class...');
 

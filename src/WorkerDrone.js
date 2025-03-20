@@ -62,39 +62,41 @@ export class WorkerDrone {
             console.log('Using cached Pickaxe model');
         } else {
             console.log('Using fallback pickaxe mesh (cache not ready)');
-            const geometry = new THREE.BoxGeometry(0.3, 0.3, 3.0);
+            const geometry = new THREE.BoxGeometry(0.3, 0.3, 3.0); // 길이 3인 직사각형
             const material = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
-            this.pickaxe = new THREE.Mesh(geometry, material);
-            this.pickaxe.position.set(1.5, 2.5, 0);
+            pickaxeModel = new THREE.Mesh(geometry, material);
         }
 
-        if (pickaxeModel) {
-            this.pickaxe = pickaxeModel;
-            this.pickaxe.scale.set(0.8, 0.8, 0.8);
-            this.pickaxe.position.set(1.5, 3.0, 0);
-        }
+        this.pickaxe = new THREE.Object3D(); // 피벗용 빈 객체 생성
+        this.pickaxeMesh = pickaxeModel; // 실제 곡괭이 메쉬
+        this.pickaxeMesh.scale.set(0.8, 0.8, 0.8);
+
+        // 곡괭이 중간을 피벗으로 설정 (길이 3의 중간 → z = -1.5로 이동 후 조정)
+        this.pickaxeMesh.position.set(0, 3, 0); // 중간이 (0, 0, 0)이 되도록
+        this.pickaxe.add(this.pickaxeMesh); // 피벗 객체에 추가
+        this.pickaxe.position.set(1.5, 3.0, 0); // 드론에서의 위치 조정
 
         this.mesh.add(this.pickaxe);
         this.swingAngle = 0;
-        this.swingSpeed = 0.1;
-        console.log('Pickaxe added to drone');
+        this.swingSpeed = 0.15; // 더 빠르게 흔들리도록 속도 증가
+        console.log('Pickaxe added to drone with pivot at center');
     }
 
     animatePickaxe() {
         this.swingAngle += this.swingSpeed;
-        if (this.swingAngle > Math.PI / 4 || this.swingAngle < -Math.PI / 4) {
+        if (this.swingAngle > Math.PI / 2 || this.swingAngle < -Math.PI / 2) { // 90도 범위로 더 크게 흔들림
             this.swingSpeed *= -1;
         }
-        this.pickaxe.rotation.z = this.swingAngle;
+        this.pickaxe.rotation.x = this.swingAngle; // 앞뒤 흔들림 (X축)
     }
 
     addResourceMesh(type) {
-        const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+        const geometry = new THREE.SphereGeometry(1.0, 16, 16);
         const material = new THREE.MeshBasicMaterial({
             color: type === 'wood' ? 0x8B4513 : 0x808080
         });
         this.resourceMesh = new THREE.Mesh(geometry, material);
-        this.resourceMesh.position.set(0, 0.8, 0);
+        this.resourceMesh.position.set(0, 4.0, -0.6);
         this.mesh.add(this.resourceMesh);
         console.log('Resource mesh added:', type);
     }
@@ -109,6 +111,7 @@ export class WorkerDrone {
 
     update() {
         this.logic.update();
+
         if (this.mesh && this.body) {
             this.mesh.position.copy(this.body.position);
 
@@ -131,6 +134,10 @@ export class WorkerDrone {
                 }
             } else {
                 console.warn('Terrain is not properly initialized in WorkerDrone');
+            }
+
+            if (this.logic.isHarvesting) {
+                this.animatePickaxe();
             }
 
             console.log('Drone mesh position updated to:', this.mesh.position);

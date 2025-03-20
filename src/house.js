@@ -1,15 +1,15 @@
 import * as THREE from 'three';
-import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-console.log('Building.js loaded successfully');
-console.log('Defining Building class...');
+console.log('House.js loaded successfully');
+console.log('Defining House class...');
 
 const CANNON = window.CANNON;
 console.log('CANNON:', CANNON);
 
-export class Building {
+export class House {
     constructor(scene, world, position, terrain) {
-        console.log('Building constructor called with scene:', scene, 'world:', world, 'position:', position);
+        console.log('House constructor called with scene:', scene, 'world:', world, 'position:', position);
         this.scene = scene;
         this.world = world;
         this.position = position;
@@ -21,17 +21,17 @@ export class Building {
     async load() {
         const loader = new GLTFLoader();
         try {
-            console.log('Attempting to load building model from: ../assets/buildings/house/house.gltf');
+            console.log('Attempting to load House model from: ../assets/buildings/house/house.gltf');
             const gltf = await new Promise((resolve, reject) => {
                 loader.load(
                     '../assets/buildings/house/house.gltf',
                     (gltf) => {
-                        console.log('Building model loaded successfully:', gltf.scene);
+                        console.log('House model loaded successfully:', gltf.scene);
                         resolve(gltf);
                     },
                     undefined,
                     (error) => {
-                        console.error('Error loading building model:', error);
+                        console.error('Error loading House model:', error);
                         reject(error);
                     }
                 );
@@ -61,9 +61,9 @@ export class Building {
             });
             this.world.addBody(this.body);
     
-            console.log('Building created at position:', this.position, 'with size:', size);
+            console.log('House created at position:', this.position, 'with size:', size);
         } catch (error) {
-            console.error('Failed to load building model:', error);
+            console.error('Failed to load House model:', error);
         }
     }
 
@@ -75,4 +75,4 @@ export class Building {
     }
 }
 
-console.log('Building class defined and exported');
+console.log('House class defined and exported');

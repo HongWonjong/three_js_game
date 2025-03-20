@@ -1,82 +1,12 @@
 import * as THREE from 'three';
-import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import { Terrain } from './Terrain.js';
 import { Player } from './Player.js';
 import { Camera } from './Camera.js';
 import { ResourceCluster } from './ResourceCluster.js';
 import { Sky } from './Sky.js';
-import { CommandCenter } from './CommandCenter.js';
-import { WorkerDrone } from './WorkerDrone.js';
 import { GameUI } from './GameUI.js';
-
-// 게임 전체 모델 캐시
-const modelCache = {
-    commandCenter: null,
-    workerDrone: null,
-    pickaxe: null
-};
-
-// 모델을 저품질로 미리 로드하는 함수
-async function preloadModels() {
-    const loader = new GLTFLoader();
-
-    // CommandCenter 모델 저품질 로드
-    if (!modelCache.commandCenter) {
-        try {
-            console.log('Preloading Command Center model (low quality)');
-            modelCache.commandCenter = await loader.loadAsync('../assets/buildings/command_center/command_center.gltf');
-            modelCache.commandCenter.scene.traverse((child) => {
-                if (child.isMesh && child.material && child.material.map) {
-                    child.material.map.minFilter = THREE.NearestFilter; // 저품질 필터
-                    child.material.map.magFilter = THREE.NearestFilter;
-                    child.material.map.anisotropy = 1; // 텍스처 선명도 낮춤
-                    child.material.needsUpdate = true;
-                }
-            });
-            console.log('Command Center model preloaded (low quality)');
-        } catch (error) {
-            console.error('Failed to preload Command Center model:', error);
-        }
-    }
-
-    // WorkerDrone 모델 저품질 로드
-    if (!modelCache.workerDrone) {
-        try {
-            console.log('Preloading WorkerDrone model (low quality)');
-            modelCache.workerDrone = await loader.loadAsync('/assets/robots/worker/worker.gltf');
-            modelCache.workerDrone.scene.traverse((child) => {
-                if (child.isMesh && child.material && child.material.map) {
-                    child.material.map.minFilter = THREE.NearestFilter;
-                    child.material.map.magFilter = THREE.NearestFilter;
-                    child.material.map.anisotropy = 1;
-                    child.material.needsUpdate = true;
-                }
-            });
-            console.log('WorkerDrone model preloaded (low quality)');
-        } catch (error) {
-            console.error('Failed to preload WorkerDrone model:', error);
-        }
-    }
-
-    // Pickaxe 모델 저품질 로드
-    if (!modelCache.pickaxe) {
-        try {
-            console.log('Preloading Pickaxe model (low quality)');
-            modelCache.pickaxe = await loader.loadAsync('/assets/tools/pickaxe/pickaxe.gltf');
-            modelCache.pickaxe.scene.traverse((child) => {
-                if (child.isMesh && child.material && child.material.map) {
-                    child.material.map.minFilter = THREE.NearestFilter;
-                    child.material.map.magFilter = THREE.NearestFilter;
-                    child.material.map.anisotropy = 1;
-                    child.material.needsUpdate = true;
-                }
-            });
-            console.log('Pickaxe model preloaded (low quality)');
-        } catch (error) {
-            console.error('Failed to preload Pickaxe model:', error);
-        }
-    }
-}
+import { preloadModels } from './ModelCache.js';
+import { BuildingManager } from './BuildingManager.js';
 
 export class Game {
     constructor() {
@@ -92,66 +22,10 @@ export class Game {
         this.commandCenters = [];
 
         window.addEventListener('resize', () => this.onWindowResize(), false);
-        this.setupInput();
         this.ui = new GameUI(this);
+        this.buildingManager = new BuildingManager(this); // BuildingManager 추가
 
         this.loadMap('maps/map1.json');
-    }
-
-    setupInput() {
-        this.raycaster = new THREE.Raycaster();
-        this.mouse = new THREE.Vector2();
-
-        document.addEventListener('click', (event) => {
-            if (event.button === 2) {
-                this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-                this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-                this.raycaster.setFromCamera(this.mouse, this.cameraController.camera);
-                const intersects = this.raycaster.intersectObject(this.terrain.mesh);
-
-                if (intersects.length > 0) {
-                    const position = intersects[0].point;
-                    this.buildCommandCenter(position);
-                }
-            }
-        });
-    }
-
-    async buildCommandCenter(position) {
-        if (this.resources.wood >= 100 && this.resources.stone >= 100) {
-            this.resources.wood -= 100;
-            this.resources.stone -= 100;
-            this.ui.updateUI();
-
-            const playerPos = this.player.mesh.position;
-            const distanceToPlayer = position.distanceTo(playerPos);
-            const minDistance = 10;
-            let adjustedPosition = position.clone();
-
-            if (distanceToPlayer < minDistance) {
-                const direction = position.clone().sub(playerPos).normalize();
-                adjustedPosition = playerPos.clone().add(direction.multiplyScalar(minDistance));
-                console.log(`Adjusted Command Center position: ${adjustedPosition.toArray()}`);
-            }
-
-            const commandCenter = new CommandCenter(
-                this.scene,
-                this.world,
-                this.resources,
-                adjustedPosition,
-                this.terrain,
-                this.resourceCluster,
-                this,
-                modelCache
-            );
-            await commandCenter.init(); // 초기화 완료 대기
-            this.commandCenters.push(commandCenter);
-            console.log('Command Center construction completed at:', adjustedPosition);
-        } else {
-            this.ui.showWarning('Not enough resources to build Command Center!');
-            console.log('Not enough resources!');
-        }
     }
 
     animate() {
@@ -175,7 +49,7 @@ export class Game {
         const mapData = await fetch(mapPath).then(res => res.json()).catch(() => ({
             width: 100, height: 100, segments: 50, hills: []
         }));
-        await preloadModels(); // 게임 시작 시 저품질 모델 로드
+        await preloadModels(); // ModelCache에서 가져옴
         await this.init(mapData);
     }
 
