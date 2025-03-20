@@ -103,8 +103,8 @@ export class Player {
             const velocity = direction.multiplyScalar(this.speed);
             this.body.velocity.set(velocity.x, this.body.velocity.y, velocity.z);
         } else {
-            this.body.velocity.x *= 0.9;
-            this.body.velocity.z *= 0.9;
+            this.body.velocity.x = 0;
+            this.body.velocity.z = 0;
         }
 
         this.jumpController.update();
