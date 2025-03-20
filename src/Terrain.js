@@ -98,9 +98,11 @@ export class Terrain {
             vertexShader: `
                 varying vec2 vUv;
                 varying float vHeight;
+                varying vec3 vNormal;
                 void main() {
                     vUv = uv;
                     vHeight = position.z;
+                    vNormal = normal;
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                 }
             `,
@@ -116,38 +118,52 @@ export class Terrain {
                 uniform float maxHeight;
                 varying vec2 vUv;
                 varying float vHeight;
-
+                varying vec3 vNormal;
+        
+                // 간단한 Perlin 노이즈 함수
                 float noise(vec2 p) {
                     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
                 }
-
+        
+                // 부드러운 블렌딩을 위한 mix 함수 활용
+                vec4 blendTextures(vec4 t1, vec4 t2, float factor) {
+                    return mix(t1, t2, smoothstep(0.3, 0.7, factor));
+                }
+        
                 void main() {
-                    float n = noise(vUv * 10.0);
+                    float n1 = noise(vUv * 5.0); // 큰 패턴 노이즈
+                    float n2 = noise(vUv * 20.0 + vec2(1.0, 2.0)); // 작은 디테일 노이즈
                     float heightFactor = clamp(vHeight / maxHeight, 0.0, 1.0);
-
-                    vec4 finalColor;
-                    if (vHeight > 0.0) {
-                        float dirtNoise = noise(vUv * 5.0 + vec2(1.0));
-                        if (dirtNoise < 0.25) {
-                            finalColor = texture2D(dirt1, vUv);
-                        } else if (dirtNoise < 0.5) {
-                            finalColor = texture2D(dirt2, vUv);
-                        } else if (dirtNoise < 0.75) {
-                            finalColor = texture2D(dirt3, vUv);
-                        } else {
-                            finalColor = texture2D(dirt4, vUv);
-                        }
-                    } else {
-                        if (n < 0.25) {
-                            finalColor = texture2D(grass1, vUv);
-                        } else if (n < 0.5) {
-                            finalColor = texture2D(grass2, vUv);
-                        } else if (n < 0.75) {
-                            finalColor = texture2D(grass3, vUv);
-                        } else {
-                            finalColor = texture2D(grass4, vUv);
-                        }
-                    }
+        
+                    vec4 grassColor, dirtColor;
+        
+                    // 풀 텍스처 블렌딩
+                    vec4 g1 = texture2D(grass1, vUv);
+                    vec4 g2 = texture2D(grass2, vUv);
+                    vec4 g3 = texture2D(grass3, vUv);
+                    vec4 g4 = texture2D(grass4, vUv);
+                    grassColor = blendTextures(g1, g2, n1);
+                    grassColor = blendTextures(grassColor, g3, n2);
+                    grassColor = blendTextures(grassColor, g4, n1 * n2);
+        
+                    // 흙 텍스처 블렌딩
+                    vec4 d1 = texture2D(dirt1, vUv);
+                    vec4 d2 = texture2D(dirt2, vUv);
+                    vec4 d3 = texture2D(dirt3, vUv);
+                    vec4 d4 = texture2D(dirt4, vUv);
+                    dirtColor = blendTextures(d1, d2, n1);
+                    dirtColor = blendTextures(dirtColor, d3, n2);
+                    dirtColor = blendTextures(dirtColor, d4, n1 * n2);
+        
+                    // 높이에 따른 풀과 흙 비율 조정
+                    float dirtMix = smoothstep(0.2, 0.8, heightFactor); // 높이가 높아질수록 흙 비율 증가
+                    vec4 finalColor = mix(grassColor, dirtColor, dirtMix);
+        
+                    // 노멀 벡터로 간단한 조명 효과 추가
+                    vec3 lightDir = normalize(vec3(5.0, 10.0, 7.5)); // DirectionalLight 위치와 일치
+                    float lightIntensity = max(dot(vNormal, lightDir), 0.1);
+                    finalColor.rgb *= lightIntensity;
+        
                     gl_FragColor = finalColor;
                 }
             `
