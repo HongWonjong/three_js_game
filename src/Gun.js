@@ -43,7 +43,7 @@ export class Gun {
 
             this.mesh = gltf.scene;
             this.mesh.scale.set(0.2, 0.2, 0.2);
-            this.mesh.position.set(0.4, -0.6, 0.5); // 플레이어 손에 맞춘 1인칭 위치
+            this.mesh.position.set(0.5, -0.6, 0.7); // 플레이어 손에 맞춘 1인칭 위치
             this.mesh.castShadow = true;
             console.log('Gun mesh created with position:', this.mesh.position);
 
@@ -87,16 +87,16 @@ export class Gun {
         const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         const bulletMesh = new THREE.Mesh(bulletGeometry, bulletMaterial);
 
-        // 총구 위치 계산 (총 메쉬의 로컬 좌표 기준)
-        const muzzleOffset = new THREE.Vector3(0, 1, 0); // 총구가 총의 앞쪽에 있다고 가정 (모델에 따라 조정 필요)
+        // 총구 위치 계산
+        const muzzleOffset = new THREE.Vector3(0, 1, 0); // 총구 위치 조정 필요 시 변경
         const muzzlePosition = muzzleOffset.clone().applyQuaternion(this.mesh.quaternion).add(this.mesh.getWorldPosition(new THREE.Vector3()));
         bulletMesh.position.copy(muzzlePosition);
         this.scene.add(bulletMesh);
 
         // 총구 방향 계산
-        const direction = new THREE.Vector3(0, 0, 1) // 총의 로컬 -Z 방향 (총구 방향)
-            .applyQuaternion(this.mesh.quaternion) // 총의 회전 적용
-            .applyQuaternion(this.playerMesh.quaternion); // 플레이어의 회전 적용
+        const direction = new THREE.Vector3(0, 0, 1)
+            .applyQuaternion(this.mesh.quaternion)
+            .applyQuaternion(this.playerMesh.quaternion);
         direction.normalize();
 
         const bulletShape = new CANNON.Sphere(0.1);
@@ -115,8 +115,10 @@ export class Gun {
         );
 
         this.world.addBody(bulletBody);
-        this.bullets.push({ mesh: bulletMesh, body: bulletBody });
+        const creationTime = performance.now(); // 총알 생성 시간 기록
+        this.bullets.push({ mesh: bulletMesh, body: bulletBody, creationTime });
 
+        // 충돌 이벤트 처리
         bulletBody.addEventListener('collide', (event) => {
             const otherBody = event.body;
             if (this.isCollidableObject(otherBody)) {
@@ -132,7 +134,7 @@ export class Gun {
         const isRock = this.resourceCluster.rocks.some(rock => rock.body === body);
         const isBuilding = this.buildings.some(building => building.body === body);
         const isPlayer = body === this.playerMesh.userData.physicsBody;
-        const isTerrain = body === this.terrain.body;
+        const isTerrain = body === this.terrain.groundBody; // 'body' 대신 'groundBody'로 수정 (Terrain.js와 일치)
 
         return isTree || isRock || isBuilding || isPlayer || isTerrain;
     }
@@ -145,12 +147,21 @@ export class Gun {
     }
 
     update() {
+        const currentTime = performance.now();
         this.bullets.forEach(bullet => {
             bullet.mesh.position.copy(bullet.body.position);
             bullet.mesh.quaternion.copy(bullet.body.quaternion);
 
+            // 지형 높이 체크
             const terrainHeight = this.terrain.getHeightAt(bullet.body.position.x, bullet.body.position.z);
             if (bullet.body.position.y - 0.05 <= terrainHeight) {
+                this.removeBullet(bullet.mesh, bullet.body);
+                return; // 제거 후 다음 총알로 넘어감
+            }
+
+            // 5초 수명 체크
+            const elapsedTime = (currentTime - bullet.creationTime) / 1000; // 초 단위
+            if (elapsedTime >= 5) {
                 this.removeBullet(bullet.mesh, bullet.body);
             }
         });
