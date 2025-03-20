@@ -12,20 +12,18 @@ export class BuildingManager {
         this.isMenuOpen = false;
         this.selectedPosition = null;
         this.buildings = [
-            { type: 'commandCenter', name: 'Command Center', wood: 100, stone: 100 },
-            { type: 'barrack', name: 'Barrack', wood: 50, stone: 50 }
+            { type: 'commandCenter', name: 'Command Center', wood: 100, stone: 100, buildTime: 20000 },
+            { type: 'barrack', name: 'Barrack', wood: 50, stone: 50, buildTime: 15000 }
         ];
         this.setupInput();
     }
 
     setupInput() {
-        // 기존 이벤트 리스너 제거 (중복 방지)
         document.removeEventListener('click', this.handleClick);
         document.removeEventListener('keydown', this.handleKeydown);
 
-        // 이벤트 핸들러를 클래스 메서드로 정의
         this.handleClick = (event) => {
-            if (event.button === 2) { // 우클릭
+            if (event.button === 2) {
                 console.log('Right-click event triggered, isMenuOpen:', this.isMenuOpen);
                 if (this.isMenuOpen) {
                     this.hideBuildMenu();
@@ -46,13 +44,11 @@ export class BuildingManager {
             }
         };
 
-        // 이벤트 리스너 등록
         document.addEventListener('click', this.handleClick);
         document.addEventListener('keydown', this.handleKeydown);
     }
 
     showBuildMenu(event) {
-        // 게임 상태가 유효한지 확인
         if (!this.game || !this.game.cameraController || !this.game.cameraController.camera || !this.game.terrain || !this.game.terrain.mesh) {
             console.error('Game state is invalid. Cannot show build menu.');
             return;
@@ -68,7 +64,6 @@ export class BuildingManager {
             this.selectedPosition = intersects[0].point;
             console.log('Selected position for building:', this.selectedPosition);
 
-            // buildMenu가 없거나 DOM에서 제거된 경우 새로 생성
             if (!this.buildMenu || !document.body.contains(this.buildMenu)) {
                 this.buildMenu = document.createElement('div');
                 this.buildMenu.style.position = 'absolute';
@@ -87,7 +82,7 @@ export class BuildingManager {
 
             this.buildMenu.innerHTML = '<h3>Select a Building:</h3>';
             this.buildings.forEach((building, index) => {
-                this.buildMenu.innerHTML += `<p>${index}: ${building.name} (Wood: ${building.wood}, Stone: ${building.stone})</p>`;
+                this.buildMenu.innerHTML += `<p>${index}: ${building.name} (Wood: ${building.wood}, Stone: ${building.stone}, Time: ${building.buildTime / 1000}s)</p>`;
             });
 
             this.isMenuOpen = true;
@@ -131,47 +126,112 @@ export class BuildingManager {
                 console.log(`Adjusted ${type} position: ${adjustedPosition.toArray()}`);
             }
 
-            let building;
-            switch (type) {
-                case 'commandCenter':
-                    building = new CommandCenter(
-                        this.game.scene,
-                        this.game.world,
-                        this.game.resources,
-                        adjustedPosition,
-                        this.game.terrain,
-                        this.game.resourceCluster,
-                        this.game,
-                        modelCache
-                    );
-                    break;
-                case 'barrack':
-                    building = new Barrack(
-                        this.game.scene,
-                        this.game.world,
-                        this.game.resources,
-                        adjustedPosition,
-                        this.game.terrain,
-                        this.game.resourceCluster,
-                        this.game,
-                        modelCache
-                    );
-                    break;
-                default:
-                    console.error('Unknown building type:', type);
-                    return;
-            }
+            // 프로토스 스타일 구체 생성
+            const sphereGeometry = new THREE.SphereGeometry(2, 32, 32);
+            const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5 });
+            const constructionSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+            constructionSphere.position.copy(adjustedPosition);
+            constructionSphere.position.y += 1; // 지형 위에 1만큼 띄움
+            this.game.scene.add(constructionSphere);
 
-            await building.init();
-            this.game.buildings.push(building);
-            console.log(`${buildingData.name} construction completed at:`, adjustedPosition);
+            // 진행률 텍스트 (Sprite 사용)
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const context = canvas.getContext('2d');
+            context.font = 'Bold 120px Arial';
+            context.fillStyle = 'white';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const progressSprite = new THREE.Sprite(spriteMaterial);
+            progressSprite.position.copy(adjustedPosition);
+            progressSprite.position.y += 4;
+            progressSprite.scale.set(4, 4, 1);
+            this.game.scene.add(progressSprite);
+
+            // 건설 애니메이션
+            const buildTime = buildingData.buildTime;
+            const startTime = performance.now();
+            const animateConstruction = () => {
+                const currentTime = performance.now();
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / buildTime, 1);
+
+                // 진행률 텍스트 업데이트
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                const percentage = Math.round(progress * 100);
+                context.fillText(`${percentage}%`, canvas.width / 2, canvas.height / 2);
+                texture.needsUpdate = true;
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateConstruction);
+                } else {
+                    // 건설 완료
+                    this.game.scene.remove(constructionSphere);
+                    this.game.scene.remove(progressSprite);
+                    sphereGeometry.dispose();
+                    sphereMaterial.dispose();
+                    spriteMaterial.dispose();
+                    texture.dispose();
+
+                    let building;
+                    switch (type) {
+                        case 'commandCenter':
+                            building = new CommandCenter(
+                                this.game.scene,
+                                this.game.world,
+                                this.game.resources,
+                                adjustedPosition,
+                                this.game.terrain,
+                                this.game.resourceCluster,
+                                this.game,
+                                modelCache
+                            );
+                            break;
+                        case 'barrack':
+                            building = new Barrack(
+                                this.game.scene,
+                                this.game.world,
+                                this.game.resources,
+                                adjustedPosition,
+                                this.game.terrain,
+                                this.game.resourceCluster,
+                                this.game,
+                                modelCache
+                            );
+                            break;
+                        default:
+                            console.error('Unknown building type:', type);
+                            return;
+                    }
+
+                    building.init().then(() => {
+                        this.game.buildings.push(building);
+                        console.log(`${buildingData.name} construction completed at:`, adjustedPosition);
+
+                        // 사운드 재생
+                        const completionSound = new Audio('../assets/sounds/building_complete.mp3');
+                        completionSound.volume = 0.5; // 볼륨 조정 (0.0 ~ 1.0)
+                        completionSound.play().catch(error => {
+                            console.error('Failed to play completion sound:', error);
+                        });
+
+                        // UI에 완료 메시지 표시
+                        this.game.ui.showCompletion(`${buildingData.name} construction completed`);
+                    });
+                }
+            };
+
+            requestAnimationFrame(animateConstruction);
         } else {
             this.game.ui.showWarning(`Not enough resources to build ${buildingData.name}!`);
             console.log('Not enough resources!');
         }
     }
 
-    // 소멸자 메서드 (필요 시 호출)
     destroy() {
         document.removeEventListener('click', this.handleClick);
         document.removeEventListener('keydown', this.handleKeydown);

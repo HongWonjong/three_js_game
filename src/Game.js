@@ -51,8 +51,6 @@ export class Game {
         await preloadModels();
         if (!modelCache.commandCenter || !modelCache.barrack) {
             console.error('Critical error: Required building models failed to preload. Check paths in ModelCache.js');
-            // 진행 중단 가능성 고려 (필요 시 주석 해제)
-            // throw new Error('Model preload failed');
         } else {
             console.log('All models preloaded successfully');
         }
