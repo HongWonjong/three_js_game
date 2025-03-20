@@ -1,13 +1,12 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 
-
 export const modelCache = {
     commandCenter: null,
     workerDrone: null,
     pickaxe: null,
     barrack: null,
-    robotSoldier: null
+    gun: null // 총 모델 추가
 };
 
 export async function preloadModels() {
@@ -89,12 +88,12 @@ export async function preloadModels() {
         }
     }
 
-    // Robot Soldier 로드 (병사)
-    if (!modelCache.robotSoldier) {
+    // Gun 로드
+    if (!modelCache.gun) {
         try {
-            console.log('Preloading Robot Soldier model');
-            modelCache.robotSoldier = await loader.loadAsync('../assets/robots/robot_soldier/robot_soldier.gltf');
-            modelCache.robotSoldier.scene.traverse((child) => {
+            console.log('Preloading Gun model');
+            modelCache.gun = await loader.loadAsync('../assets/gun/gun.gltf');
+            modelCache.gun.scene.traverse((child) => {
                 if (child.isMesh && child.material && child.material.map) {
                     child.material.map.minFilter = THREE.NearestFilter;
                     child.material.map.magFilter = THREE.NearestFilter;
@@ -102,10 +101,12 @@ export async function preloadModels() {
                     child.material.needsUpdate = true;
                 }
             });
-            console.log('Robot Soldier model preloaded successfully');
-            console.log('Robot Soldier animations:', modelCache.robotSoldier.animations);
+            console.log('Gun model preloaded successfully');
         } catch (error) {
-            console.error('Failed to preload Robot Soldier model:', error);
+            console.error('Failed to preload Gun model:', error);
         }
     }
 }
+
+// 초기 로드 시작
+preloadModels();

@@ -12,6 +12,7 @@ export class Barrack {
         this.resourceCluster = resourceCluster;
         this.game = game;
         this.mesh = null;
+        this.body = null;
         this.soldiers = [];
         this.maxSoldiers = 4;
         this.spawnInterval = 5;
@@ -51,7 +52,7 @@ export class Barrack {
         }
 
         if (model) {
-            this.mesh = model.clone(); // 기본 클론만 사용
+            this.mesh = model.clone();
             this.mesh.scale.set(0.2, 0.2, 0.2);
             console.log('Using cached Barrack model');
             const boundingBox = new THREE.Box3().setFromObject(this.mesh);
@@ -79,27 +80,30 @@ export class Barrack {
     }
 
     async spawnSoldiers() {
-        const spawnSoldier = async () => {
+        const spawnSoldier = async (offsetX, offsetZ) => {
             if (this.soldiers.length >= this.maxSoldiers) return;
 
-            const spawnOffset = new THREE.Vector3(
-                (Math.random() - 0.5) * 2,
-                0,
-                (Math.random() - 0.5) * 2
-            );
+            const spawnOffset = new THREE.Vector3(offsetX, 0, offsetZ);
             const spawnPosition = this.position.clone().add(spawnOffset);
             const terrainHeight = this.terrain.getHeightAt(spawnPosition.x, spawnPosition.z);
             spawnPosition.y = terrainHeight + 0.025;
 
-            const soldier = new RobotSoldier(this.scene, spawnPosition, this.game.player, this.game);
+            const soldier = await RobotSoldier.create(this.scene, spawnPosition, this.game.player, this.game);
             this.soldiers.push(soldier);
             console.log('Robot soldier spawned at:', spawnPosition);
         };
 
-        for (let i = 0; i < this.maxSoldiers; i++) {
-            await new Promise(resolve => requestAnimationFrame(() => {
-                spawnSoldier().then(resolve);
-            }));
+        // 상하좌우 15만큼 떨어진 위치에 생성
+        const spawnPositions = [
+            [0, 15],   // 상 (북)
+            [0, -15],  // 하 (남)
+            [-15, 0],  // 좌 (서)
+            [15, 0]    // 우 (동)
+        ];
+
+        for (let i = 0; i < Math.min(this.maxSoldiers, spawnPositions.length); i++) {
+            const [offsetX, offsetZ] = spawnPositions[i];
+            await spawnSoldier(offsetX, offsetZ);
         }
         console.log('Total soldiers spawned:', this.soldiers.length);
     }
@@ -116,16 +120,29 @@ export class Barrack {
     }
 
     async spawnSoldierAsync() {
-        const spawnOffset = new THREE.Vector3(
-            (Math.random() - 0.5) * 2,
-            0,
-            (Math.random() - 0.5) * 2
+        // 비동기 스폰 시에도 상하좌우 위치 중 하나를 선택
+        const spawnPositions = [
+            [0, 15],   // 상
+            [0, -15],  // 하
+            [-15, 0],  // 좌
+            [15, 0]    // 우
+        ];
+        const availablePositions = spawnPositions.filter(pos => 
+            !this.soldiers.some(soldier => 
+                Math.abs(soldier.position.x - (this.position.x + pos[0])) < 1 &&
+                Math.abs(soldier.position.z - (this.position.z + pos[1])) < 1
+            )
         );
+
+        if (availablePositions.length === 0 || this.soldiers.length >= this.maxSoldiers) return;
+
+        const [offsetX, offsetZ] = availablePositions[Math.floor(Math.random() * availablePositions.length)];
+        const spawnOffset = new THREE.Vector3(offsetX, 0, offsetZ);
         const spawnPosition = this.position.clone().add(spawnOffset);
         const terrainHeight = this.terrain.getHeightAt(spawnPosition.x, spawnPosition.z);
         spawnPosition.y = terrainHeight + 0.025;
 
-        const soldier = new RobotSoldier(this.scene, spawnPosition, this.game.player, this.game);
+        const soldier = await RobotSoldier.create(this.scene, spawnPosition, this.game.player, this.game);
         this.soldiers.push(soldier);
         console.log('Robot soldier spawned asynchronously at:', spawnPosition);
     }
