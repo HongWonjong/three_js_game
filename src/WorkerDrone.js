@@ -40,6 +40,9 @@ export class WorkerDrone {
 
         this.scene.add(this.mesh);
 
+        // mesh가 설정된 후에 사운드 초기화
+        this.logic.setupMiningSound();
+
         const shape = new CANNON.Box(new CANNON.Vec3(size.x / 2, size.y / 2, size.z / 2));
         this.body = new CANNON.Body({ mass: 1 });
         this.body.addShape(shape);
@@ -62,32 +65,29 @@ export class WorkerDrone {
             console.log('Using cached Pickaxe model');
         } else {
             console.log('Using fallback pickaxe mesh (cache not ready)');
-            const geometry = new THREE.BoxGeometry(0.3, 0.3, 3.0); // 길이 3인 직사각형
+            const geometry = new THREE.BoxGeometry(0.3, 0.3, 3.0);
             const material = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
             pickaxeModel = new THREE.Mesh(geometry, material);
         }
 
-        this.pickaxe = new THREE.Object3D(); // 피벗용 빈 객체 생성
-        this.pickaxeMesh = pickaxeModel; // 실제 곡괭이 메쉬
+        this.pickaxe = new THREE.Object3D();
+        this.pickaxeMesh = pickaxeModel;
         this.pickaxeMesh.scale.set(0.8, 0.8, 0.8);
-
-        // 곡괭이 중간을 피벗으로 설정 (길이 3의 중간 → z = -1.5로 이동 후 조정)
-        this.pickaxeMesh.position.set(0, 3, 0); // 중간이 (0, 0, 0)이 되도록
-        this.pickaxe.add(this.pickaxeMesh); // 피벗 객체에 추가
-        this.pickaxe.position.set(1.5, 3.0, 0); // 드론에서의 위치 조정
-
+        this.pickaxeMesh.position.set(0, 3, 0);
+        this.pickaxe.add(this.pickaxeMesh);
+        this.pickaxe.position.set(1.5, 3.0, 0);
         this.mesh.add(this.pickaxe);
         this.swingAngle = 0;
-        this.swingSpeed = 0.15; // 더 빠르게 흔들리도록 속도 증가
+        this.swingSpeed = 0.15;
         console.log('Pickaxe added to drone with pivot at center');
     }
 
     animatePickaxe() {
         this.swingAngle += this.swingSpeed;
-        if (this.swingAngle > Math.PI / 2 || this.swingAngle < -Math.PI / 2) { // 90도 범위로 더 크게 흔들림
+        if (this.swingAngle > Math.PI / 2 || this.swingAngle < -Math.PI / 2) {
             this.swingSpeed *= -1;
         }
-        this.pickaxe.rotation.x = this.swingAngle; // 앞뒤 흔들림 (X축)
+        this.pickaxe.rotation.x = this.swingAngle;
     }
 
     addResourceMesh(type) {
@@ -142,5 +142,11 @@ export class WorkerDrone {
 
             console.log('Drone mesh position updated to:', this.mesh.position);
         }
+    }
+
+    static async create(scene, world, terrain, resourceCluster, commandCenter, modelCache) {
+        const drone = new WorkerDrone(scene, world, terrain, resourceCluster, commandCenter, modelCache);
+        await drone.createDrone();
+        return drone;
     }
 }

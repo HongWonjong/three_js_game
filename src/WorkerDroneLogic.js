@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { audioListener } from './Camera.js';
 
 export class WorkerDroneLogic {
     constructor(drone, world, terrain, resourceCluster, commandCenter) {
@@ -16,14 +17,35 @@ export class WorkerDroneLogic {
         this.avoidanceDuration = 3;
         this.lastUpdateTime = 0;
         this.updateInterval = 0.3;
-        this.isHarvesting = false; // 채굴 상태 추가
-        this.harvestStartTime = 0; // 채굴 시작 시간 추가
-        this.harvestDuration = 3; // 채굴 시간 3초
+        this.isHarvesting = false;
+        this.harvestStartTime = 0;
+        this.harvestDuration = 3;
+
+        this.miningSound = null; // 초기화 지연
         console.log('WorkerDroneLogic initialized');
     }
 
+    setupMiningSound() {
+        this.miningSound = new THREE.PositionalAudio(audioListener);
+        this.miningSound.setRefDistance(10);
+        this.miningSound.setRolloffFactor(1);
+        this.miningSound.setMaxDistance(50);
+        this.miningSound.setLoop(true);
+        this.miningSound.setVolume(0.5);
+
+        const audioLoader = new THREE.AudioLoader();
+        audioLoader.load('../assets/sounds/mining.mp3', (buffer) => {
+            this.miningSound.setBuffer(buffer);
+            console.log('Mining sound loaded successfully');
+        }, undefined, (error) => {
+            console.error('Failed to load mining sound:', error);
+        });
+
+        this.drone.mesh.add(this.miningSound);
+        console.log('Mining sound added to drone mesh');
+    }
+
     findNearestTarget() {
-        // 기존 로직 동일
         const trees = this.resourceCluster.trees || [];
         const rocks = this.resourceCluster.rocks || [];
         console.log('Available trees:', trees.length, 'rocks:', rocks.length);
@@ -59,7 +81,6 @@ export class WorkerDroneLogic {
     }
 
     findSafeWaypoint(currentPos, targetPos) {
-        // 기존 로직 동일
         const directionToTarget = targetPos.clone().sub(currentPos).setY(0).normalize();
         const testAngles = [-Math.PI / 2, Math.PI / 2, -Math.PI / 4, Math.PI / 4];
         let bestWaypoint = null;
@@ -91,7 +112,6 @@ export class WorkerDroneLogic {
     }
 
     moveToTarget(targetPos) {
-        // 기존 로직 동일
         if (!targetPos) {
             console.log('No target position provided, stopping drone');
             this.drone.body.velocity.set(0, this.drone.body.velocity.y, 0);
@@ -173,7 +193,7 @@ export class WorkerDroneLogic {
 
         this.carrying = { type: target.type, amount: harvestAmount };
         this.drone.addResourceMesh(this.carrying.type);
-        this.isHarvesting = false; // 채굴 완료
+        this.isHarvesting = false;
         console.log('Resource collected, carrying:', this.carrying);
     }
 
@@ -192,6 +212,10 @@ export class WorkerDroneLogic {
                 if (!this.target) {
                     console.log('No resources available, drone idle');
                     this.drone.body.velocity.set(0, this.drone.body.velocity.y, 0);
+                    if (this.miningSound && this.miningSound.isPlaying) {
+                        this.miningSound.stop();
+                        console.log('Mining sound stopped due to idle state');
+                    }
                     return;
                 }
             }
@@ -202,18 +226,30 @@ export class WorkerDroneLogic {
                 if (!this.isHarvesting) {
                     this.isHarvesting = true;
                     this.harvestStartTime = currentTime;
-                    this.drone.body.velocity.set(0, this.drone.body.velocity.y, 0); // 채굴 중 이동 멈춤
+                    this.drone.body.velocity.set(0, this.drone.body.velocity.y, 0);
+                    if (this.miningSound && !this.miningSound.isPlaying) {
+                        this.miningSound.play();
+                        console.log('Mining sound started');
+                    }
                     console.log('Starting harvest of', this.target.type, 'at', this.target.body.position);
                 }
 
                 const timeSinceHarvestStart = currentTime - this.harvestStartTime;
                 if (timeSinceHarvestStart >= this.harvestDuration) {
                     this.collectResource(this.target);
+                    if (this.miningSound && this.miningSound.isPlaying) {
+                        this.miningSound.stop();
+                        console.log('Mining sound stopped after harvest');
+                    }
                 } else {
                     console.log('Harvesting in progress, time remaining:', (this.harvestDuration - timeSinceHarvestStart).toFixed(2), 'seconds');
                 }
             } else {
                 this.moveToTarget(this.target.body.position);
+                if (this.miningSound && this.miningSound.isPlaying) {
+                    this.miningSound.stop();
+                    console.log('Mining sound stopped while moving to target');
+                }
             }
         } else {
             const dist = this.drone.body.position.distanceTo(this.commandCenter.body.position);
@@ -225,6 +261,10 @@ export class WorkerDroneLogic {
                 console.log('Resource delivered to Command Center');
             } else {
                 this.moveToTarget(this.commandCenter.body.position);
+            }
+            if (this.miningSound && this.miningSound.isPlaying) {
+                this.miningSound.stop();
+                console.log('Mining sound stopped while returning to Command Center');
             }
         }
     }

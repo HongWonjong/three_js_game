@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+// 전역 AudioListener 선언
+export const audioListener = new THREE.AudioListener();
+
 console.log('Camera.js loaded successfully');
 console.log('Defining Camera class...');
 
@@ -12,6 +15,10 @@ export class Camera {
             0.1,
             1000
         );
+
+        // AudioListener를 카메라에 추가
+        this.camera.add(audioListener);
+        console.log('AudioListener added to camera (global)');
 
         // 초기 거리 설정
         this.baseY = 5; // 기본 Y 오프셋
@@ -30,7 +37,6 @@ export class Camera {
     }
 
     onMouseWheel(event) {
-        // 마우스 휠 방향에 따라 거리 비율 조정
         const delta = event.deltaY * -0.001;
         this.distance -= delta;
         this.distance = THREE.MathUtils.clamp(this.distance, this.minDistance, this.maxDistance);
@@ -38,18 +44,14 @@ export class Camera {
     }
 
     update(playerPosition, rotationY) {
-        // 거리 비율에 따라 Y, Z 오프셋 계산 (비율 유지)
         const yOffset = this.baseY * this.distance;
         const zOffset = this.baseZ * this.distance;
 
-        // 오프셋 설정
         const offset = new THREE.Vector3(0, yOffset, zOffset)
             .applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
         const cameraPosition = playerPosition.clone().add(offset);
         
         this.camera.position.copy(cameraPosition);
-
-        // 플레이어를 정 중앙에 위치시키도록 조정
         this.camera.lookAt(playerPosition);
     }
 }
