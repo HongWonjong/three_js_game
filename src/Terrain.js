@@ -16,7 +16,6 @@ export class Terrain {
         this.world = world;
         this.trees = [];
         this.rocks = [];
-        this.buildings = [];
         this.mesh = null;
     }
 
@@ -202,21 +201,6 @@ export class Terrain {
         console.log('Terrain mesh assigned:', this.mesh);
     }
 
-    async createBuildings() {
-        console.log('Creating buildings...');
-        const { width, height } = this.mapData;
-        for (let i = 0; i < 5; i++) {
-            const x = (Math.random() - 0.5) * width * 0.8;
-            const z = (Math.random() - 0.5) * height * 0.8;
-            const y = this.getHeightAt(x, z);
-            const position = new THREE.Vector3(x, y, z);
-            const building = new Building(this.scene, this.world, position, this);
-            await building.load();
-            this.buildings.push(building);
-            console.log(`Building ${i + 1} created at position:`, position);
-        }
-        console.log('Buildings created:', this.buildings.length);
-    }
 
     async createResourceClusters() {
         console.log('Creating resource clusters...');

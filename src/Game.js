@@ -4,7 +4,6 @@ import { Terrain } from './Terrain.js';
 import { Player } from './Player.js';
 import { Camera } from './Camera.js';
 import { ResourceCluster } from './ResourceCluster.js';
-import { Building } from './Building.js';
 import { Sky } from './Sky.js';
 import { CommandCenter } from './CommandCenter.js';
 import { WorkerDrone } from './WorkerDrone.js';
@@ -195,14 +194,6 @@ export class Game {
 
         this.resourceCluster = new ResourceCluster(this.scene, this.terrain, this.world);
         await this.resourceCluster.createClusters();
-
-        this.buildings = [];
-        const buildingPositions = [new THREE.Vector3(10, 0, 10), new THREE.Vector3(-10, 0, -10)];
-        for (const pos of buildingPositions) {
-            const building = new Building(this.scene, this.world, pos, this.terrain);
-            await building.load();
-            this.buildings.push(building);
-        }
 
         this.player = new Player(this.scene, this.terrain, this.world, this.resourceCluster, this.buildings);
         this.sky = new Sky(this.scene);
