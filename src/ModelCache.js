@@ -1,19 +1,22 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 
+
 export const modelCache = {
     commandCenter: null,
     workerDrone: null,
     pickaxe: null,
-    barrack: null
+    barrack: null,
+    robotSoldier: null
 };
 
 export async function preloadModels() {
     const loader = new GLTFLoader();
 
+    // Command Center 로드
     if (!modelCache.commandCenter) {
         try {
-            console.log('Preloading Command Center model (low quality)');
+            console.log('Preloading Command Center model');
             modelCache.commandCenter = await loader.loadAsync('../assets/buildings/command_center/command_center.gltf');
             modelCache.commandCenter.scene.traverse((child) => {
                 if (child.isMesh && child.material && child.material.map) {
@@ -29,11 +32,11 @@ export async function preloadModels() {
         }
     }
 
+    // Worker Drone 로드 (일꾼)
     if (!modelCache.workerDrone) {
-        // 기존 로직 동일
         try {
-            console.log('Preloading WorkerDrone model (low quality)');
-            modelCache.workerDrone = await loader.loadAsync('/assets/robots/worker/worker.gltf');
+            console.log('Preloading WorkerDrone model');
+            modelCache.workerDrone = await loader.loadAsync('../assets/robots/worker/worker.gltf');
             modelCache.workerDrone.scene.traverse((child) => {
                 if (child.isMesh && child.material && child.material.map) {
                     child.material.map.minFilter = THREE.NearestFilter;
@@ -48,11 +51,11 @@ export async function preloadModels() {
         }
     }
 
+    // Pickaxe 로드
     if (!modelCache.pickaxe) {
-        // 기존 로직 동일
         try {
-            console.log('Preloading Pickaxe model (low quality)');
-            modelCache.pickaxe = await loader.loadAsync('/assets/tools/pickaxe/pickaxe.gltf');
+            console.log('Preloading Pickaxe model');
+            modelCache.pickaxe = await loader.loadAsync('../assets/tools/pickaxe/pickaxe.gltf');
             modelCache.pickaxe.scene.traverse((child) => {
                 if (child.isMesh && child.material && child.material.map) {
                     child.material.map.minFilter = THREE.NearestFilter;
@@ -67,9 +70,10 @@ export async function preloadModels() {
         }
     }
 
+    // Barrack 로드
     if (!modelCache.barrack) {
         try {
-            console.log('Preloading Barrack model (low quality)');
+            console.log('Preloading Barrack model');
             modelCache.barrack = await loader.loadAsync('../assets/buildings/barrack/barrack.gltf');
             modelCache.barrack.scene.traverse((child) => {
                 if (child.isMesh && child.material && child.material.map) {
@@ -82,6 +86,26 @@ export async function preloadModels() {
             console.log('Barrack model preloaded successfully');
         } catch (error) {
             console.error('Failed to preload Barrack model:', error);
+        }
+    }
+
+    // Robot Soldier 로드 (병사)
+    if (!modelCache.robotSoldier) {
+        try {
+            console.log('Preloading Robot Soldier model');
+            modelCache.robotSoldier = await loader.loadAsync('../assets/robots/robot_soldier/robot_soldier.gltf');
+            modelCache.robotSoldier.scene.traverse((child) => {
+                if (child.isMesh && child.material && child.material.map) {
+                    child.material.map.minFilter = THREE.NearestFilter;
+                    child.material.map.magFilter = THREE.NearestFilter;
+                    child.material.map.anisotropy = 1;
+                    child.material.needsUpdate = true;
+                }
+            });
+            console.log('Robot Soldier model preloaded successfully');
+            console.log('Robot Soldier animations:', modelCache.robotSoldier.animations);
+        } catch (error) {
+            console.error('Failed to preload Robot Soldier model:', error);
         }
     }
 }

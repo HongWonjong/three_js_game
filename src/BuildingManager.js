@@ -11,16 +11,20 @@ export class BuildingManager {
         this.buildMenu = null;
         this.isMenuOpen = false;
         this.selectedPosition = null;
-        this.setupInput();
-
         this.buildings = [
             { type: 'commandCenter', name: 'Command Center', wood: 100, stone: 100 },
             { type: 'barrack', name: 'Barrack', wood: 50, stone: 50 }
         ];
+        this.setupInput();
     }
 
     setupInput() {
-        document.addEventListener('click', (event) => {
+        // 기존 이벤트 리스너 제거 (중복 방지)
+        document.removeEventListener('click', this.handleClick);
+        document.removeEventListener('keydown', this.handleKeydown);
+
+        // 이벤트 핸들러를 클래스 메서드로 정의
+        this.handleClick = (event) => {
             if (event.button === 2) { // 우클릭
                 console.log('Right-click event triggered, isMenuOpen:', this.isMenuOpen);
                 if (this.isMenuOpen) {
@@ -29,9 +33,9 @@ export class BuildingManager {
                     this.showBuildMenu(event);
                 }
             }
-        });
+        };
 
-        document.addEventListener('keydown', (event) => {
+        this.handleKeydown = (event) => {
             if (this.isMenuOpen && this.selectedPosition) {
                 const index = parseInt(event.key);
                 if (!isNaN(index) && index >= 0 && index < this.buildings.length) {
@@ -40,10 +44,20 @@ export class BuildingManager {
                     this.hideBuildMenu();
                 }
             }
-        });
+        };
+
+        // 이벤트 리스너 등록
+        document.addEventListener('click', this.handleClick);
+        document.addEventListener('keydown', this.handleKeydown);
     }
 
     showBuildMenu(event) {
+        // 게임 상태가 유효한지 확인
+        if (!this.game || !this.game.cameraController || !this.game.cameraController.camera || !this.game.terrain || !this.game.terrain.mesh) {
+            console.error('Game state is invalid. Cannot show build menu.');
+            return;
+        }
+
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -54,8 +68,8 @@ export class BuildingManager {
             this.selectedPosition = intersects[0].point;
             console.log('Selected position for building:', this.selectedPosition);
 
-            // 건물 선택 UI 생성 또는 재사용
-            if (!this.buildMenu) {
+            // buildMenu가 없거나 DOM에서 제거된 경우 새로 생성
+            if (!this.buildMenu || !document.body.contains(this.buildMenu)) {
                 this.buildMenu = document.createElement('div');
                 this.buildMenu.style.position = 'absolute';
                 this.buildMenu.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
@@ -64,15 +78,13 @@ export class BuildingManager {
                 this.buildMenu.style.borderRadius = '5px';
                 this.buildMenu.style.zIndex = '1000';
                 document.body.appendChild(this.buildMenu);
-                console.log('Build menu DOM element created');
+                console.log('Build menu DOM element recreated');
             }
 
-            // 메뉴 표시 및 위치 설정
-            this.buildMenu.style.display = 'block'; // 숨김 해제
+            this.buildMenu.style.display = 'block';
             this.buildMenu.style.left = `${event.clientX + 10}px`;
             this.buildMenu.style.top = `${event.clientY + 10}px`;
 
-            // 건물 목록 갱신
             this.buildMenu.innerHTML = '<h3>Select a Building:</h3>';
             this.buildings.forEach((building, index) => {
                 this.buildMenu.innerHTML += `<p>${index}: ${building.name} (Wood: ${building.wood}, Stone: ${building.stone})</p>`;
@@ -141,7 +153,8 @@ export class BuildingManager {
                         adjustedPosition,
                         this.game.terrain,
                         this.game.resourceCluster,
-                        this.game
+                        this.game,
+                        modelCache
                     );
                     break;
                 default:
@@ -156,5 +169,17 @@ export class BuildingManager {
             this.game.ui.showWarning(`Not enough resources to build ${buildingData.name}!`);
             console.log('Not enough resources!');
         }
+    }
+
+    // 소멸자 메서드 (필요 시 호출)
+    destroy() {
+        document.removeEventListener('click', this.handleClick);
+        document.removeEventListener('keydown', this.handleKeydown);
+        if (this.buildMenu && document.body.contains(this.buildMenu)) {
+            document.body.removeChild(this.buildMenu);
+        }
+        this.buildMenu = null;
+        this.isMenuOpen = false;
+        console.log('BuildingManager destroyed');
     }
 }

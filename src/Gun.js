@@ -14,14 +14,32 @@ export class Gun {
         this.world = world;
         this.terrain = terrain;
         this.resourceCluster = resourceCluster;
-        this.buildings = buildings;
         this.bullets = [];
+        this.lastShotTime = 0;
+        this.fireRate = 0.5;
+        this.isZoomMode = false; // 줌 모드 상태 추가
         this.createGun();
 
+        // 클릭 이벤트 (발사)
         document.addEventListener('click', (event) => {
             if (event.button === 0) {
                 if (document.pointerLockElement === document.body) {
                     this.shoot();
+                }
+            }
+        });
+
+        // F 키로 줌 모드 토글
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'f' || event.key === 'F') {
+                this.isZoomMode = !this.isZoomMode;
+                console.log('Zoom mode:', this.isZoomMode ? 'ON' : 'OFF');
+                if (!this.isZoomMode && this.trajectoryLine) {
+                    // 줌 모드가 꺼지면 궤적 제거
+                    this.scene.remove(this.trajectoryLine);
+                    this.trajectoryLine.geometry.dispose();
+                    this.trajectoryLine.material.dispose();
+                    this.trajectoryLine = null;
                 }
             }
         });
@@ -82,7 +100,45 @@ export class Gun {
         }
     }
 
+    showPredictedTrajectory() {
+        // 기존 궤적 선이 있으면 제거
+        if (this.trajectoryLine) {
+            this.scene.remove(this.trajectoryLine);
+            this.trajectoryLine.geometry.dispose();
+            this.trajectoryLine.material.dispose();
+        }
+
+        // 총구 위치와 방향 계산
+        const muzzleOffset = new THREE.Vector3(0, 1, 0);
+        const muzzlePosition = muzzleOffset.clone().applyQuaternion(this.mesh.quaternion).add(this.mesh.getWorldPosition(new THREE.Vector3()));
+        const direction = new THREE.Vector3(0, 0, 1)
+            .applyQuaternion(this.mesh.quaternion)
+            .applyQuaternion(this.playerMesh.quaternion)
+            .normalize();
+
+        // 궤적의 끝점 계산 (최대 거리 설정, 예: 100 유닛)
+        const maxDistance = 100;
+        const endPoint = muzzlePosition.clone().add(direction.clone().multiplyScalar(maxDistance));
+
+        // 궤적 선 생성
+        const geometry = new THREE.BufferGeometry().setFromPoints([muzzlePosition, endPoint]);
+        const material = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 });
+        this.trajectoryLine = new THREE.Line(geometry, material);
+        this.scene.add(this.trajectoryLine);
+
+        console.log('Predicted trajectory shown from:', muzzlePosition, 'to:', endPoint);
+    }
+
     shoot() {
+        const currentTime = performance.now() / 1000;
+        const timeSinceLastShot = currentTime - this.lastShotTime;
+
+        if (timeSinceLastShot < this.fireRate) {
+            return;
+        }
+
+        this.lastShotTime = currentTime;
+
         const bulletGeometry = new THREE.SphereGeometry(0.2, 16, 16);
         const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         const bulletMesh = new THREE.Mesh(bulletGeometry, bulletMaterial);
@@ -105,7 +161,7 @@ export class Gun {
         });
         bulletBody.position.copy(bulletMesh.position);
 
-        const bulletSpeed = 200;
+        const bulletSpeed = 400;
         bulletBody.velocity.set(
             direction.x * bulletSpeed,
             direction.y * bulletSpeed,
@@ -113,8 +169,7 @@ export class Gun {
         );
 
         this.world.addBody(bulletBody);
-        const creationTime = performance.now();
-        this.bullets.push({ mesh: bulletMesh, body: bulletBody, creationTime });
+        this.bullets.push({ mesh: bulletMesh, body: bulletBody });
 
         bulletBody.addEventListener('collide', (event) => {
             const otherBody = event.body;
@@ -123,7 +178,6 @@ export class Gun {
             }
         });
 
-        // 발사음 재생 (새 Audio 인스턴스 생성)
         const gunshotSound = new Audio('../assets/sounds/gunshot.mp3');
         gunshotSound.volume = 0.2;
         gunshotSound.play().catch(error => {
@@ -136,11 +190,10 @@ export class Gun {
     isCollidableObject(body) {
         const isTree = this.resourceCluster.trees.some(tree => tree.body === body);
         const isRock = this.resourceCluster.rocks.some(rock => rock.body === body);
-        const isBuilding = this.buildings.some(building => building.body === body);
         const isPlayer = body === this.playerMesh.userData.physicsBody;
         const isTerrain = body === this.terrain.groundBody;
 
-        return isTree || isRock || isBuilding || isPlayer || isTerrain;
+        return isTree || isRock || isPlayer || isTerrain;
     }
 
     removeBullet(mesh, body) {
@@ -151,22 +204,15 @@ export class Gun {
     }
 
     update() {
-        const currentTime = performance.now();
         this.bullets.forEach(bullet => {
             bullet.mesh.position.copy(bullet.body.position);
             bullet.mesh.quaternion.copy(bullet.body.quaternion);
-
-            const terrainHeight = this.terrain.getHeightAt(bullet.body.position.x, bullet.body.position.z);
-            if (bullet.body.position.y - 0.05 <= terrainHeight) {
-                this.removeBullet(bullet.mesh, bullet.body);
-                return;
-            }
-
-            const elapsedTime = (currentTime - bullet.creationTime) / 1000;
-            if (elapsedTime >= 5) {
-                this.removeBullet(bullet.mesh, bullet.body);
-            }
         });
+
+        // 줌 모드일 때 궤적 지속적으로 업데이트
+        if (this.isZoomMode) {
+            this.showPredictedTrajectory();
+        }
     }
 }
 
