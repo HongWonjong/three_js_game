@@ -1,54 +1,132 @@
 import * as THREE from 'three';
 import { modelCache } from './ModelCache.js';
+import { RobotSoldier } from './RobotSoldier.js';
 
 export class Barrack {
     constructor(scene, world, resources, position, terrain, resourceCluster, game) {
         this.scene = scene;
         this.world = world;
         this.resources = resources;
-        this.position = position; // 지형 표면 위치
+        this.position = position;
         this.terrain = terrain;
         this.resourceCluster = resourceCluster;
         this.game = game;
         this.mesh = null;
-        this.body = null;
+        this.soldiers = [];
+        this.maxSoldiers = 4;
+        this.spawnInterval = 5;
+        this.timeSinceLastSpawn = 0;
+        this.isLoading = true;
     }
 
     async init() {
         console.log('Barrack init called with position:', this.position);
 
-        // 모델 로드
-        if (!modelCache.barrack) {
-            console.error('Barrack model not loaded in modelCache');
-            const geometry = new THREE.BoxGeometry(1, 1, 1); // 대체 모델
-            const material = new THREE.MeshBasicMaterial({ color: 0x808080 });
-            this.mesh = new THREE.Mesh(geometry, material);
-        } else {
-            this.mesh = modelCache.barrack.scene.clone();
-            this.mesh.scale.set(0.2, 0.2, 0.2); // 크기 조정
-            console.log('Barrack mesh loaded from cache');
+        this.createPlaceholder();
+        await this.createBarrack();
+        this.isLoading = false;
+        await this.spawnSoldiers();
+        console.log('Barrack fully initialized with soldiers');
+    }
+
+    createPlaceholder() {
+        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+        const material = new THREE.MeshBasicMaterial({ color: 0x808080, wireframe: true });
+        this.mesh = new THREE.Mesh(geometry, material);
+        const terrainHeight = this.terrain.getHeightAt(this.position.x, this.position.z);
+        this.position.y = terrainHeight;
+        this.mesh.position.copy(this.position);
+        this.scene.add(this.mesh);
+        console.log('Placeholder Barrack added at:', this.position);
+    }
+
+    async createBarrack() {
+        let model = modelCache.barrack ? modelCache.barrack.scene : null;
+        let size = new THREE.Vector3(0.2, 0.2, 0.2);
+
+        if (this.mesh && this.mesh.geometry && this.mesh.material) {
+            this.scene.remove(this.mesh);
+            this.mesh.geometry.dispose();
+            this.mesh.material.dispose();
         }
 
-        // 위치 설정 (지형 표면에서 1 유닛 위로 띄움)
-        const adjustedPosition = this.position.clone();
-        adjustedPosition.y += 1; // 1 유닛 띄우기
-        this.mesh.position.copy(adjustedPosition);
-        this.scene.add(this.mesh);
-        console.log('Barrack mesh added to scene at:', this.mesh.position);
+        if (model) {
+            this.mesh = model.clone(); // 기본 클론만 사용
+            this.mesh.scale.set(0.2, 0.2, 0.2);
+            console.log('Using cached Barrack model');
+            const boundingBox = new THREE.Box3().setFromObject(this.mesh);
+            boundingBox.getSize(size);
+            console.log('Barrack model size:', size);
+        } else {
+            console.error('Barrack model not loaded in modelCache');
+            const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            const material = new THREE.MeshBasicMaterial({ color: 0x808080 });
+            this.mesh = new THREE.Mesh(geometry, material);
+        }
 
-        // 물리 바디 설정
-        const shape = new CANNON.Box(new CANNON.Vec3(1, 1, 1)); // 크기 조정 필요 시 수정
-        this.body = new CANNON.Body({
-            mass: 0, // 정적 객체
-            shape,
-            material: new CANNON.Material('buildingMaterial')
-        });
-        this.body.position.copy(adjustedPosition); // 물리 바디도 동일하게 띄움
+        const terrainHeight = this.terrain.getHeightAt(this.position.x, this.position.z);
+        this.position.y = terrainHeight;
+        this.mesh.position.copy(this.position);
+        this.scene.add(this.mesh);
+
+        const shape = new CANNON.Box(new CANNON.Vec3(size.x / 2, size.y / 2, size.z / 2));
+        this.body = new CANNON.Body({ mass: 0 });
+        this.body.addShape(shape);
+        this.body.position.copy(this.position);
         this.world.addBody(this.body);
-        console.log('Barrack body added to world at:', this.body.position);
+
+        console.log('Barrack fully loaded and added at:', this.position);
+    }
+
+    async spawnSoldiers() {
+        const spawnSoldier = async () => {
+            if (this.soldiers.length >= this.maxSoldiers) return;
+
+            const spawnOffset = new THREE.Vector3(
+                (Math.random() - 0.5) * 2,
+                0,
+                (Math.random() - 0.5) * 2
+            );
+            const spawnPosition = this.position.clone().add(spawnOffset);
+            const terrainHeight = this.terrain.getHeightAt(spawnPosition.x, spawnPosition.z);
+            spawnPosition.y = terrainHeight + 0.025;
+
+            const soldier = new RobotSoldier(this.scene, spawnPosition, this.game.player, this.game);
+            this.soldiers.push(soldier);
+            console.log('Robot soldier spawned at:', spawnPosition);
+        };
+
+        for (let i = 0; i < this.maxSoldiers; i++) {
+            await new Promise(resolve => requestAnimationFrame(() => {
+                spawnSoldier().then(resolve);
+            }));
+        }
+        console.log('Total soldiers spawned:', this.soldiers.length);
     }
 
     update(delta) {
-        // 나중에 막사 고유 기능 추가 시 사용
+        if (!this.isLoading) {
+            this.timeSinceLastSpawn += delta;
+            if (this.timeSinceLastSpawn >= this.spawnInterval && this.soldiers.length < this.maxSoldiers) {
+                this.spawnSoldierAsync();
+                this.timeSinceLastSpawn = 0;
+            }
+            this.soldiers.forEach(soldier => soldier.update(delta));
+        }
+    }
+
+    async spawnSoldierAsync() {
+        const spawnOffset = new THREE.Vector3(
+            (Math.random() - 0.5) * 2,
+            0,
+            (Math.random() - 0.5) * 2
+        );
+        const spawnPosition = this.position.clone().add(spawnOffset);
+        const terrainHeight = this.terrain.getHeightAt(spawnPosition.x, spawnPosition.z);
+        spawnPosition.y = terrainHeight + 0.025;
+
+        const soldier = new RobotSoldier(this.scene, spawnPosition, this.game.player, this.game);
+        this.soldiers.push(soldier);
+        console.log('Robot soldier spawned asynchronously at:', spawnPosition);
     }
 }

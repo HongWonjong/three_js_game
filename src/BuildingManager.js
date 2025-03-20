@@ -12,8 +12,8 @@ export class BuildingManager {
         this.isMenuOpen = false;
         this.selectedPosition = null;
         this.buildings = [
-            { type: 'commandCenter', name: 'Command Center', wood: 100, stone: 100, buildTime: 20000 },
-            { type: 'barrack', name: 'Barrack', wood: 50, stone: 50, buildTime: 15000 }
+            { type: 'commandCenter', name: 'Command Center', wood: 100, stone: 100, buildTime: 2000 },
+            { type: 'barrack', name: 'Barrack', wood: 50, stone: 50, buildTime: 1500 }
         ];
         this.setupInput();
     }
@@ -131,7 +131,7 @@ export class BuildingManager {
             const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5 });
             const constructionSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
             constructionSphere.position.copy(adjustedPosition);
-            constructionSphere.position.y += 1; // 지형 위에 1만큼 띄움
+            constructionSphere.position.y += 3; // 지형 위에 1만큼 띄움
             this.game.scene.add(constructionSphere);
 
             // 진행률 텍스트 (Sprite 사용)
@@ -148,7 +148,7 @@ export class BuildingManager {
             const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
             const progressSprite = new THREE.Sprite(spriteMaterial);
             progressSprite.position.copy(adjustedPosition);
-            progressSprite.position.y += 4;
+            progressSprite.position.y += 6;
             progressSprite.scale.set(4, 4, 1);
             this.game.scene.add(progressSprite);
 
